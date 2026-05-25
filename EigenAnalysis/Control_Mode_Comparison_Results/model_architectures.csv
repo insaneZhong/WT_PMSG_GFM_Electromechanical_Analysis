@@ -1,0 +1,5 @@
+Model,MSC,GSC,CausalRole
+GFL-WT,MSC-MPPT,GSC-DVC + PLL,Reference baseline
+GFM-GWT,MSC-MPPT,GSC-DVC + GFM,Isolate PLL-to-GFM synchronization
+GFM-MWT,MSC-DVC,GSC-GFM,Isolate DC-link control allocation
+GFM-MWT+AD,MSC-DVC,GSC-GFM + APCAD,Isolate added damping control
