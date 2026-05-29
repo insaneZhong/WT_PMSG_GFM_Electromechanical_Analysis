@@ -97,8 +97,14 @@ for s = 1:numel(sweep_defs)
             if any(strcmp(sweep_defs(s).name, {'SCR', 'XR'}))
                 [params.rg, params.lg] = grid_impedance(params);
             end
-            A = make_A(models(m).data, mpopt, params);
-            metric = torsion_metric(A, models(m).data.X_stac, 2);
+            try
+                A = make_A(models(m).data, mpopt, params);
+                metric = torsion_metric(A, models(m).data.X_stac, 2);
+                metric.Converged = true;
+                metric.Message = "";
+            catch ME
+                metric = missing_metric(ME.message);
+            end
             metric.Sweep = string(sweep_defs(s).name);
             metric.Value = values(k);
             metric.Model = string(models(m).label);
@@ -129,13 +135,17 @@ fprintf('\nSweep summary: torsional damping ratio and overall stability\n');
 for s = 1:numel(sweep_defs)
     for m = 1:numel(models)
         rows = all_sweeps(all_sweeps.Sweep == sweep_defs(s).name & all_sweeps.Model == models(m).label, :);
-        fprintf('%s, %s: zeta=[%.6g, %.6g], sigma=[%.6g, %.6g], max_real_max=%.6g\n', ...
-            sweep_defs(s).name, models(m).label, min(rows.DampingRatio), max(rows.DampingRatio), ...
-            min(rows.Sigma), max(rows.Sigma), max(rows.MaxReal));
-        [peak_real, peak_index] = max(rows.MaxReal);
-        if peak_real >= 0
+        valid_rows = rows(rows.Converged, :);
+        failed_count = height(rows) - height(valid_rows);
+        fprintf('%s, %s: valid=%d/%d, failed=%d, zeta=[%.6g, %.6g], sigma=[%.6g, %.6g], max_real_max=%.6g\n', ...
+            sweep_defs(s).name, models(m).label, height(valid_rows), height(rows), failed_count, ...
+            min(valid_rows.DampingRatio, [], 'omitnan'), max(valid_rows.DampingRatio, [], 'omitnan'), ...
+            min(valid_rows.Sigma, [], 'omitnan'), max(valid_rows.Sigma, [], 'omitnan'), ...
+            max(valid_rows.MaxReal, [], 'omitnan'));
+        [peak_real, peak_index] = max(valid_rows.MaxReal, [], 'omitnan');
+        if ~isempty(valid_rows) && peak_real >= 0
             fprintf('  unstable peak at %s=%.6g: dominant f=%.6g Hz, sigma=%.6g\n', ...
-                sweep_defs(s).name, rows.Value(peak_index), rows.DominantFrequencyHz(peak_index), peak_real);
+                sweep_defs(s).name, valid_rows.Value(peak_index), valid_rows.DominantFrequencyHz(peak_index), peak_real);
         end
     end
 end
@@ -257,6 +267,11 @@ for k = 1:numel(names)
     values{k} = params.(names{k});
 end
 A = double(subs(model.sym_A, names, values));
+end
+
+function metric = missing_metric(message)
+metric = table(NaN, NaN, NaN, NaN, NaN, NaN, NaN, false, false, string(message), ...
+    'VariableNames', {'MaxReal', 'DominantFrequencyHz', 'DominantSigma', 'Sigma', 'Omega', 'FrequencyHz', 'DampingRatio', 'Stable', 'Converged', 'Message'});
 end
 
 function [metric, mode_index] = torsion_metric(A, state_vector, target_hz)

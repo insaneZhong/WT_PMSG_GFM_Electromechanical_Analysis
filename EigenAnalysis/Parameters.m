@@ -5,8 +5,8 @@
 % [TEMP]     Temporary 1 MW-class value used to run the WT-PMSG workflow. Replace before final study.
 
 %% Power Injection Setpoints
-P_inj = 0.9;                 % [USER] Active power injection operating point (pu of S_base).
-Q_inj = 0.1;                 % [USER] Reactive power injection operating point (pu of S_base).
+P_inj = 1.0;                 % [USER] Active power injection operating point (pu of S_base). Use 1.0 for strict 1 MW same-object alignment.
+Q_inj = 0.0;                 % [USER] Reactive power injection operating point (pu of S_base). Use 0 for baseline no-disturbance steady test.
 
 %% General System Parameters
 f_base = 50;                 % [USER] Grid nominal frequency (Hz), normally 50 Hz in China.
@@ -16,8 +16,8 @@ f_sample = 20e3;             % [USER/DESIGN] Control sampling frequency (Hz). Ma
 f_step = 100e3;              % [USER/DESIGN] Simulation calculation/update frequency (Hz). Match EMT step size.
 
 %% Inverter Ratings
-Vdc = 1.5e3;                 % [TEMP/USER] Rated DC-link voltage (V). Replace with target converter DC rating.
-V_LL = 0.69e3;               % [TEMP/USER] Rated AC line-to-line voltage (V). Replace with target turbine/converter voltage.
+Vdc = 1.5e3;                 % [USER] Rated DC-link voltage (V), aligned with nonlinear model setup.
+V_LL = 0.69e3;               % [USER] Rated AC line-to-line voltage (V), aligned with nonlinear model setup.
 S_base = 1e6;                % [TEMP/USER] Rated apparent power (VA). Current value is for a 1 MW-class test case.
 Zb = V_LL^2 / S_base;        % [DERIVED] Base impedance (Ohms), used for pu-to-SI conversion.
 Lb = Zb / wn;                % [DERIVED] Base inductance (H), used for grid inductance conversion.
@@ -30,16 +30,16 @@ rg = rgpu * Zb;              % [DERIVED] Grid resistance in Ohms.
 lg = lgpu * Lb;              % [DERIVED] Grid inductance in H.
 
 %% Switching and Control Delays
-fsw = 5e3;                   % [USER/DESIGN] PWM switching frequency (Hz). Replace with converter switching frequency.
+fsw = 4e3;                   % [USER/DESIGN] PWM switching frequency (Hz), aligned with C controller Ts=250 us.
 td = 1.5 / fsw;              % [DERIVED/DESIGN] Equivalent digital/PWM delay used by inner-loop model (s).
 
 %% LCL Filter Parameters
-lf1 = 140e-6;                % [USER/TEMP] Converter-side LCL inductor (H). Replace with actual filter design.
-rf1 = 0.05 * Zb;             % [USER/TEMP] Converter-side inductor resistance (Ohms). Current value is 5% of Zb.
-lf2 = 14e-6;                 % [USER/TEMP] Grid-side LCL inductor (H). Replace with actual filter design.
-rf2 = rf1;                   % [USER/TEMP] Grid-side inductor resistance (Ohms). Current assumption: same as rf1.
-cf = 334e-6;                 % [USER/TEMP] LCL filter capacitor (F). Replace with actual filter design.
-rd = 65e-3;                  % [USER/TEMP] Passive damping resistor of LCL capacitor branch (Ohms).
+lf1 = 120e-6;                % [USER] Converter-side LCL inductor (H), from nonlinear model constant GRID_FILTER__LS.
+rf1 = 8.3e-3;                % [USER] Converter-side inductor resistance (Ohms), aligned to nonlinear LCL branch.
+lf2 = 120e-6;                % [USER] Grid-side LCL inductor (H), equivalent branch used in nonlinear model.
+rf2 = 8.3e-3;                % [USER] Grid-side inductor resistance (Ohms), same-order as converter-side branch.
+cf = 55e-6;                  % [USER] LCL filter capacitor (F), from nonlinear model constant GRID_FILTER__C.
+rd = 0.1;                    % [USER] Passive damping resistor (Ohms), aligned to nonlinear capacitor branch damping.
 L_t = lf1 + lf2 + lg;        % [DERIVED] Total series inductance seen by converter and grid (H).
 f_res = (1/(2*pi)) * sqrt((lf1 + lf2 + lg) / (lf1 *(lf2+lg)* cf)); % [DERIVED] LCL resonance frequency with grid inductance (Hz).
 f_ares = (1/(2*pi)) * sqrt(1 / (lf1 * cf)); % [DERIVED] Anti-resonance frequency approximation (Hz).
@@ -93,45 +93,53 @@ rv = 0;                      % [DESIGN/TEMP] Virtual resistance in grid-side con
 %% WT-PMSG Electromechanical Parameters
 % First-pass 1 MW class values for eigenvalue workflow validation.
 % Replace these with the target turbine data before final paper/simulation conclusions.
-n_p = 50;                    % [TEMP/USER] PMSG pole pairs. Determines electrical-mechanical speed conversion.
-omega_g0 = wn / n_p;         % [TEMP/DERIVED] Generator mechanical operating speed (rad/s). Current assumption: electrical speed equals grid base frequency.
-R_s = 0.01;                  % [TEMP/USER] PMSG stator phase resistance (Ohms). Replace with generator datasheet value.
-L_d = 2e-3;                  % [TEMP/USER] PMSG d-axis stator inductance (H). Replace with generator datasheet value.
-L_q = 2e-3;                  % [TEMP/USER] PMSG q-axis stator inductance (H). Replace with generator datasheet value.
-psi_f = 2.0;                 % [TEMP/USER] Permanent-magnet flux linkage (Wb). Determines torque constant.
+n_p = 20;                    % [USER] PMSG pole pairs, aligned with nonlinear controller macro MOTOR_POLE_PAIR.
+omega_g0 = 2*pi*150/60;      % [USER] Generator mechanical operating speed (rad/s), aligned with nonlinear model variable omega_m0 (=15.7079 rad/s).
+R_s = 0.0122;                % [USER] PMSG stator phase resistance (Ohms), from nonlinear controller macro MOTOR_RS.
+L_d = 1.05e-3;               % [USER] PMSG d-axis stator inductance (H), aligned with PMSM mask.
+L_q = 1.05e-3;               % [USER] PMSG q-axis stator inductance (H), aligned with PMSM mask.
+psi_f = 8.64;                % [USER] PM flux linkage (Wb), from nonlinear model PMSM1 Flux.
 i_m_d0 = 0;                  % [USER/DESIGN] d-axis current operating point (A). Often set to zero for surface-PMSG/MTPA simplification.
-T_e0 = P_inj * S_base / omega_g0; % [DERIVED] Electromagnetic torque operating point from power balance (N*m).
+T_e0 = P_inj * S_base / omega_g0; % [DERIVED] Electromagnetic torque operating point (N*m), aligned with 1 MW / omega_g0.
 i_m_q0 = T_e0 / (1.5 * n_p * psi_f); % [DERIVED] q-axis current operating point from torque equation (A).
 
-J_t = 4.0e6;                 % [TEMP/USER] Turbine/low-speed-side equivalent inertia (kg*m^2). Critical for torsional mode.
-J_g = 5.0e5;                 % [TEMP/USER] Generator/high-speed-side equivalent inertia (kg*m^2). Critical for torsional mode.
-K_sh = 7.0e7;                % [TEMP/USER] Shaft equivalent stiffness (N*m/rad). Mainly sets torsional natural frequency.
-D_sh = 1.0e5;                % [TEMP/USER] Shaft mechanical damping (N*m*s/rad). Mainly sets inherent torsional damping.
+P_wt_rated = S_base;         % [USER] Wind turbine rated power used for steady operating point consistency.
+omega_m0 = omega_g0;         % [USER] Same-object alignment: use the same generator-side operating speed as nonlinear model.
+J_g = 1.8375e5;              % [USER] Generator inertia (kg*m^2), from nonlinear PMSM/mechanical setup.
+J_t = 8.0 * J_g;             % [USER] Turbine inertia (kg*m^2), aligned with nonlinear two-mass assumption.
+f_sh_init_guess = 2.0;       % [USER] Initial shaft mode guess (Hz), used to initialize K_sh/D_sh consistently.
+zeta_sh_init_guess = 0.01;   % [USER] Initial shaft damping ratio guess.
+J_eq = J_t * J_g / (J_t + J_g);               % [DERIVED] Equivalent two-mass inertia for torsional mode.
+w_sh_init_guess = 2*pi*f_sh_init_guess;       % [DERIVED] Shaft modal angular frequency guess.
+K_sh = J_eq * w_sh_init_guess^2;              % [DERIVED/USER] Shaft stiffness aligned with nonlinear initialization.
+D_sh = 2*zeta_sh_init_guess*w_sh_init_guess*J_eq; % [DERIVED/USER] Shaft damping aligned with nonlinear initialization.
 
 % Linear aerodynamic restoring path at the below-rated MPPT operating point.
 % Around the optimum tip-speed ratio, dTm/domega_t = -T0/omega0 and
 % dTm/dvw = 3*T0/vw0. The pitch derivative must be replaced for above-rated studies.
-v_w0 = 12;                   % [TEMP/USER] Baseline wind speed (m/s) for the current MPPT operating point.
-D_aero = T_e0 / omega_g0;   % [DERIVED/TEMP] Aerodynamic damping coefficient; used as -D_aero*Delta_omega_t.
+v_w0 = 12;                   % [USER] Baseline wind speed (m/s) for the current MPPT operating point.
+T_aero0 = T_e0;              % [DERIVED/USER] Initial aerodynamic torque balance for no-acceleration equilibrium.
+theta_tw0 = T_e0 / K_sh;     % [DERIVED/USER] Initial shaft twist at equilibrium.
+D_aero = T_aero0 / omega_m0; % [DERIVED/USER] Aerodynamic damping coefficient around operating point.
 K_v_aero = 3*T_e0 / v_w0;   % [DERIVED/TEMP] Wind-speed-to-aerodynamic-torque gain (N*m/(m/s)).
 K_beta_aero = 0;             % [TEMP/USER] Pitch-to-torque gain (N*m/rad); zero in below-rated operation.
 D_t = 0.005 * D_aero;        % [TEMP/USER] Turbine-side viscous/self damping (N*m*s/rad).
 D_g = 0.005 * D_aero;        % [TEMP/USER] Generator-side viscous/self damping (N*m*s/rad).
-k_p_mppt = 3*P_inj*S_base / omega_g0; % [DERIVED/TEMP] GFM-MWT active-power MPPT slope dPref/domega_g (W/(rad/s)).
+k_p_mppt = 3*P_wt_rated / omega_g0; % [DERIVED] GFM-MWT active-power MPPT slope dPref/domega_g (W/(rad/s)) at 1 MW operating point.
 
 Tmsc = 2 * td;               % [DESIGN] Machine-side converter current-loop target time constant (s).
 k_pm = L_d / Tmsc;           % [DERIVED/DESIGN] MSC current-loop proportional gain.
 k_im = R_s / Tmsc;           % [DERIVED/DESIGN] MSC current-loop integral gain.
 k_pdc = 0.5;                 % [TEMP/DESIGN] DC-link voltage controller proportional gain. Needs retuning for target converter.
 k_idc = 50;                  % [TEMP/DESIGN] DC-link voltage controller integral gain. Needs retuning for target converter.
-C_dc = 20e-3;                % [TEMP/USER] DC-link capacitance (F). Replace with converter hardware value.
+C_dc = 1.5e-3;               % [USER] DC-link capacitance (F), aligned with nonlinear macro GRID_UDC__C.
 V_dc0 = Vdc;                 % [DERIVED] DC-link voltage operating point (V).
 
 %% Shaft Torsional Damping Controller
 % The damping path is added in WT_PMSG_VSG_Damping_Model.mlx.
 % Current values are preliminary and tuned around the present 2 Hz torsional mode.
 % Re-tune them after replacing the temporary WT-PMSG parameters or changing SCR/XR range.
-f_damp = 2.0;                 % [DESIGN/TEMP] Target torsional mode frequency (Hz), from eigenvalue result near 1.997 Hz.
+f_damp = f_sh_init_guess;     % [DESIGN/TEMP] Target torsional mode frequency (Hz), initialized from shaft-mode estimate.
 w_damp = 2 * pi * f_damp;     % [DERIVED] Band-pass filter center angular frequency (rad/s).
 zeta_damp = 0.20;             % [DESIGN/TEMP] Band-pass damping ratio / bandwidth factor. Larger means wider pass band.
 T_lead_damp = 1 / w_damp;     % [DESIGN/TEMP] Lead compensation time constant (s), initial value matched to target frequency.
@@ -164,7 +172,8 @@ save('Parameters.mat', 'f_base', 'f_sample','f_step', 'wn', 'w','V_LL', 'S_base'
      'fsw','f_res', 'f_ares', 'f_ares','td', 'lf1', 'rf1', 'lf2', 'rf2','cf', 'rd', 'SCR', 'XR', 'rgpu', 'lgpu', 'rg', 'lg', 'k_pi', 'k_ii', ...
      'beta_v', 'k_pv','k_iv','beta_i','Tic', 'mp', 'h', 'k_pq', 'cs','rs', 'k_iq', 'P_inj', 'Q_inj','a','b','c','w_cp','lv','rv', ...
      'n_p', 'omega_g0', 'R_s', 'L_d', 'L_q', 'psi_f', 'i_m_d0', 'i_m_q0', ...
-     'J_t', 'J_g', 'K_sh', 'D_sh', 'v_w0', 'D_aero', 'K_v_aero', 'K_beta_aero', 'D_t', 'D_g', 'k_p_mppt', ...
+     'P_wt_rated', 'omega_m0', 'J_t', 'J_g', 'K_sh', 'D_sh', 'T_aero0', 'theta_tw0', ...
+     'v_w0', 'D_aero', 'K_v_aero', 'K_beta_aero', 'D_t', 'D_g', 'k_p_mppt', ...
      'k_pm', 'k_im', 'k_pdc', 'k_idc', 'C_dc', 'V_dc0', ...
      'f_damp', 'w_damp', 'zeta_damp', 'T_lead_damp', 'alpha_lead_damp', 'K_damp', ...
      'k_p_pll', 'k_i_pll', 'k_pdc_gfl', 'k_idc_gfl', 'k_pq_gfl', 'k_iq_gfl', 'k_t_mppt', ...
