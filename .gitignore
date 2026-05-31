@@ -2,3 +2,5 @@ slprj/
 *.slxc
 *.mexw64
 *.autosave
+.DS_Store
+~$*.docx
