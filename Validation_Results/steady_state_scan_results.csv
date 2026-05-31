@@ -1,0 +1,19 @@
+k_pdc,k_idc,D_sh,D_sh_scale,omega_g_slope,omega_t_slope,Tsh_slope,score,status,errmsg
+0.35,20,32840.1152055253,0.8,NaN,NaN,NaN,Inf,failed,Missing omega_g/omega_t/T_sh outputs.
+0.35,20,49260.172808288,1.2,NaN,NaN,NaN,Inf,failed,Missing omega_g/omega_t/T_sh outputs.
+0.35,50,32840.1152055253,0.8,NaN,NaN,NaN,Inf,failed,Missing omega_g/omega_t/T_sh outputs.
+0.35,50,49260.172808288,1.2,NaN,NaN,NaN,Inf,failed,Missing omega_g/omega_t/T_sh outputs.
+0.35,80,32840.1152055253,0.8,NaN,NaN,NaN,Inf,failed,Missing omega_g/omega_t/T_sh outputs.
+0.35,80,49260.172808288,1.2,NaN,NaN,NaN,Inf,failed,Missing omega_g/omega_t/T_sh outputs.
+0.5,20,32840.1152055253,0.8,NaN,NaN,NaN,Inf,failed,Missing omega_g/omega_t/T_sh outputs.
+0.5,20,49260.172808288,1.2,NaN,NaN,NaN,Inf,failed,Missing omega_g/omega_t/T_sh outputs.
+0.5,50,32840.1152055253,0.8,NaN,NaN,NaN,Inf,failed,Missing omega_g/omega_t/T_sh outputs.
+0.5,50,49260.172808288,1.2,NaN,NaN,NaN,Inf,failed,Missing omega_g/omega_t/T_sh outputs.
+0.5,80,32840.1152055253,0.8,NaN,NaN,NaN,Inf,failed,Missing omega_g/omega_t/T_sh outputs.
+0.5,80,49260.172808288,1.2,NaN,NaN,NaN,Inf,failed,Missing omega_g/omega_t/T_sh outputs.
+0.7,20,32840.1152055253,0.8,NaN,NaN,NaN,Inf,failed,Missing omega_g/omega_t/T_sh outputs.
+0.7,20,49260.172808288,1.2,NaN,NaN,NaN,Inf,failed,Missing omega_g/omega_t/T_sh outputs.
+0.7,50,32840.1152055253,0.8,NaN,NaN,NaN,Inf,failed,Missing omega_g/omega_t/T_sh outputs.
+0.7,50,49260.172808288,1.2,NaN,NaN,NaN,Inf,failed,Missing omega_g/omega_t/T_sh outputs.
+0.7,80,32840.1152055253,0.8,NaN,NaN,NaN,Inf,failed,Missing omega_g/omega_t/T_sh outputs.
+0.7,80,49260.172808288,1.2,NaN,NaN,NaN,Inf,failed,Missing omega_g/omega_t/T_sh outputs.

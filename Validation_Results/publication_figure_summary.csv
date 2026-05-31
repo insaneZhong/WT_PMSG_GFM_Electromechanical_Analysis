@@ -1,0 +1,2 @@
+scenario,schemeA,Pref_end,Pmeas_mean,Udc_mean,Udc_slope,Wref_mean,PreSyn_mean,OmegaG_slope,ThetaTw_slope
+baseline,0,1000000,0.0204644991254556,5017.12577400256,355.794171505586,310.970567202477,0,-0.261693391982193,-0.00318762414620295

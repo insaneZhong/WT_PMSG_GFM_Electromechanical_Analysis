@@ -1,0 +1,2 @@
+SimStop,SignalEnd,Pref_end,Pmeas_mean,Pmeas_end,Pmeas_slope,Udc_mean,Udc_end,Udc_slope,Wref_mean,Wref_end,PreSyn_mean,PreSyn_end,PreSyn_max
+8,8,1000000,-699843.118256743,102059968,-2019594.28170538,1153.99540862852,776.104854711476,-373.879583839978,309.112171336964,309,1,1,1
