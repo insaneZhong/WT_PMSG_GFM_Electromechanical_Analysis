@@ -31,14 +31,35 @@ void motor_init(MOTOR *p)
 //##########################################################################################################
 void motor_control(MOTOR *p)
 {	
-    float  Lq_Ld_temp,Temp1,Temp2;
+    float iq_ref_target;
 
-    p->pwm_speed_pi.Ref = p->ref.voltage_ref;
-    p->pwm_speed_pi.Fdb = p->bak.Udc1;
-    motor_PI2_calc(&p->pwm_speed_pi);
-    
  	p->val.Id_ref  = 0;
- 	p->val.Iq_ref  =  - p->pwm_speed_pi.Out;
+    p->iq_slope_limit.Ts = p->Ts;
+    p->iq_slope_limit.Init = 0;
+    p->iq_slope_limit.Slope = MOTOR_IQ_REF_SLOPE_LIMIT_MAX;
+
+    if (p->ref.dvc_enable == 0)
+    {
+        /* Presynchronization: avoid integral accumulation before power export. */
+        p->pwm_speed_pi.reset(&p->pwm_speed_pi);
+        p->iq_slope_limit.reset(&p->iq_slope_limit);
+        p->val.Iq_ref = 0;
+    }
+    else
+    {
+        p->pwm_speed_pi.Ref = p->ref.voltage_ref;
+        p->pwm_speed_pi.Fdb = p->bak.Udc1;
+        motor_PI2_calc(&p->pwm_speed_pi);
+
+        /* Feedforward follows the staged GSC export command; PI corrects Udc. */
+        iq_ref_target = -MOTOR_IQ_POWER_FF_A_PER_W * p->ref.active_power_ref
+                        - p->pwm_speed_pi.Out;
+        if (iq_ref_target > MOTOR_IQ_LIMIT_MAX) iq_ref_target = MOTOR_IQ_LIMIT_MAX;
+        if (iq_ref_target < -MOTOR_IQ_LIMIT_MAX) iq_ref_target = -MOTOR_IQ_LIMIT_MAX;
+        p->iq_slope_limit.In = iq_ref_target;
+        motor_slope_limit_calc(&p->iq_slope_limit);
+        p->val.Iq_ref = p->iq_slope_limit.Out;
+    }
  	//*********电流反馈***********************
 
     p->val.RotorPos    = p->bak.RotorPos*p->par.Polar;

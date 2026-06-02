@@ -19,6 +19,7 @@
  */
 #include   "simstruc.h"
 #include   <math.h>
+#include   <string.h>
 #include   "motorcontrol.h"
 #include        "grid_forming_control.h"
 #ifdef ENABLE_SCHEMEA_OVERRIDES
@@ -52,6 +53,133 @@ float       system_Time=0;
 
 extern MOTOR_PI   voltage_loop_pi;
 extern MOTOR_PI   PLL_loop_pi;
+extern MOTOR_SLOPE_LIMIT vloop_slope;
+extern MOTOR_PI d_loop_pi;
+extern MOTOR_PI q_loop_pi;
+extern MOTOR_PI d_voltage_loop_pi;
+extern MOTOR_PI q_voltage_loop_pi;
+extern MOTOR_PI E_voltage_loop_pi;
+extern MOTOR_PI power_loop_pi;
+extern CLACK clack_trans;
+extern PARK park_u;
+extern PARK park_PLL;
+extern MOTOR_LOW_PASS_FILTER lpf;
+extern MOTOR_LOW_PASS_FILTER lpf1;
+extern MOTOR_HIGH_PASS_FILTER hpf;
+extern MOTOR_BAND_PASS_FILTER bandpf;
+
+static void reset_controller_state(void)
+{
+    PWM svpwm1_defaults = PWM_DEFAULTS;
+    PWM svpwm2_defaults = PWM_DEFAULTS;
+    MOTOR motor_defaults = MOTOR_DEFAULTS;
+
+    FPGAPWMTimerCounter1 = 0;
+    FPGAPWMTimerPeriod1 = 10;
+    FPGAPWMTimerIntruptIndex1 = 0;
+    PwmPulseSate1 = 0;
+    FPGAPWMTimerCounter2 = 0;
+    FPGAPWMTimerPeriod2 = 10;
+    FPGAPWMTimerIntruptIndex2 = 0;
+    PwmPulseSate2 = 0;
+    ControlTimerCounter = 0;
+    ControlTimerPeriod = 100;
+    ControlTimerEnable = 0;
+    ControlTimerFlag = 0;
+    ControlTimerIntruptIndex = 0;
+    Ts_control = 0;
+    PWMSegmentNumber = 7;
+    vector = 0;
+    vector1 = 0;
+    system_Time = 0;
+
+    svpwm1 = svpwm1_defaults;
+    svpwm2 = svpwm2_defaults;
+    motor = motor_defaults;
+    svpwm1.init(&svpwm1);
+    svpwm2.init(&svpwm2);
+    motor.init(&motor);
+    grid_side_reset();
+}
+
+static void rebind_controller_callbacks(void)
+{
+    PWM pwm_defaults = PWM_DEFAULTS;
+    MOTOR motor_defaults = MOTOR_DEFAULTS;
+    MOTOR_PI d_loop_defaults = CURRENT_PI_ID_DEFAULTS;
+    MOTOR_PI q_loop_defaults = CURRENT_PI_IQ_DEFAULTS;
+    MOTOR_PI d_voltage_loop_defaults = VOLTAGE_LOOP_PI_DEFAULTS;
+    MOTOR_PI q_voltage_loop_defaults = VOLTAGE_LOOP_PI_DEFAULTS;
+    MOTOR_PI pll_loop_defaults = PLL_LOOP_PI_DEFAULTS;
+    MOTOR_PI e_voltage_loop_defaults = E_VOLTAGE_LOOP_PI_DEFAULTS;
+    MOTOR_PI power_loop_defaults = POWER_LOOP_PI_DEFAULTS;
+
+    svpwm1.init = pwm_defaults.init;
+    svpwm1.reset = pwm_defaults.reset;
+    svpwm1.calc = pwm_defaults.calc;
+    svpwm2.init = pwm_defaults.init;
+    svpwm2.reset = pwm_defaults.reset;
+    svpwm2.calc = pwm_defaults.calc;
+
+    motor.init = motor_defaults.init;
+    motor.control = motor_defaults.control;
+    motor.reset = motor_defaults.reset;
+    motor.id_pi.calc1 = motor_defaults.id_pi.calc1;
+    motor.id_pi.calc2 = motor_defaults.id_pi.calc2;
+    motor.id_pi.reset = motor_defaults.id_pi.reset;
+    motor.iq_pi.calc1 = motor_defaults.iq_pi.calc1;
+    motor.iq_pi.calc2 = motor_defaults.iq_pi.calc2;
+    motor.iq_pi.reset = motor_defaults.iq_pi.reset;
+    motor.pwm_speed_pi.calc1 = motor_defaults.pwm_speed_pi.calc1;
+    motor.pwm_speed_pi.calc2 = motor_defaults.pwm_speed_pi.calc2;
+    motor.pwm_speed_pi.reset = motor_defaults.pwm_speed_pi.reset;
+    motor.id_slope_limit.cale = motor_defaults.id_slope_limit.cale;
+    motor.id_slope_limit.reset = motor_defaults.id_slope_limit.reset;
+    motor.iq_slope_limit.cale = motor_defaults.iq_slope_limit.cale;
+    motor.iq_slope_limit.reset = motor_defaults.iq_slope_limit.reset;
+    motor.speed_slope_limit.cale = motor_defaults.speed_slope_limit.cale;
+    motor.speed_slope_limit.reset = motor_defaults.speed_slope_limit.reset;
+
+#define RELOAD_PI_PARAMS(target, defaults) \
+    (target).Kp = (defaults).Kp; \
+    (target).Ki = (defaults).Ki; \
+    (target).Kc = (defaults).Kc; \
+    (target).Kd = (defaults).Kd; \
+    (target).OutMax = (defaults).OutMax; \
+    (target).OutMin = (defaults).OutMin
+    RELOAD_PI_PARAMS(motor.id_pi, motor_defaults.id_pi);
+    RELOAD_PI_PARAMS(motor.iq_pi, motor_defaults.iq_pi);
+    RELOAD_PI_PARAMS(motor.pwm_speed_pi, motor_defaults.pwm_speed_pi);
+    RELOAD_PI_PARAMS(d_loop_pi, d_loop_defaults);
+    RELOAD_PI_PARAMS(q_loop_pi, q_loop_defaults);
+    RELOAD_PI_PARAMS(d_voltage_loop_pi, d_voltage_loop_defaults);
+    RELOAD_PI_PARAMS(q_voltage_loop_pi, q_voltage_loop_defaults);
+    RELOAD_PI_PARAMS(PLL_loop_pi, pll_loop_defaults);
+    RELOAD_PI_PARAMS(E_voltage_loop_pi, e_voltage_loop_defaults);
+    RELOAD_PI_PARAMS(power_loop_pi, power_loop_defaults);
+#undef RELOAD_PI_PARAMS
+}
+
+#if defined(MATLAB_MEX_FILE)
+static mxArray *snapshot_bytes(const void *source, size_t count)
+{
+    mxArray *value = mxCreateNumericMatrix(1, count, mxUINT8_CLASS, mxREAL);
+    memcpy(mxGetData(value), source, count);
+    return value;
+}
+
+static int restore_bytes(SimStruct *S, const mxArray *snapshot,
+                         const char *name, void *target, size_t count)
+{
+    const mxArray *value = mxGetField(snapshot, 0, name);
+    if (value == NULL || !mxIsUint8(value) || mxGetNumberOfElements(value) != count) {
+        ssSetErrorStatus(S, "Invalid or incompatible GFM S-Function operating point.");
+        return 0;
+    }
+    memcpy(target, mxGetData(value), count);
+    return 1;
+}
+#endif
 
 /* Function: mdlInitializeSizes ===============================================
  * Abstract:
@@ -81,27 +209,9 @@ static void mdlInitializeSizes(SimStruct *S)
     ssSetNumModes(S, 0);
     ssSetNumNonsampledZCs(S, 0);
     /* Specify the sim state compliance to be same as a built-in block */
-    ssSetSimStateCompliance(S, USE_DEFAULT_SIM_STATE);
+    ssSetOperatingPointCompliance(S, USE_CUSTOM_OPERATING_POINT);
     ssSetOptions(S, 0);
-     /* ---------------------------------------------------------*/
-    FPGAPWMTimerCounter1        =0;
-    FPGAPWMTimerPeriod1         =10;
-    FPGAPWMTimerCounter2        =0;
-    FPGAPWMTimerPeriod2         =10;
-    ControlTimerCounter         =0;
-    ControlTimerPeriod          =100;
-    ControlTimerEnable          =0;
-    ControlTimerFlag            =0;
-    ControlTimerIntruptIndex    =0;
-    FPGAPWMTimerIntruptIndex1   =0;
-    FPGAPWMTimerIntruptIndex2   =0;    
-    PwmPulseSate1               =0;
-    PwmPulseSate2               =0;
-    Ts_control                  =0;
-    PWMSegmentNumber=7;
-   /* ---------------------------------------------------------*/
-    svpwm1.init(&svpwm1);
-    motor.init(&motor);  
+    reset_controller_state();
 }
 /* Function: mdlInitializeSampleTimes =========================================
  * Abstract:
@@ -132,7 +242,7 @@ static void mdlInitializeSampleTimes(SimStruct *S)
     real_T *x0 = ssGetRealDiscStates(S);
   }
 #endif /* MDL_INITIALIZE_CONDITIONS */
-#undef MDL_START  /* Change to #undef to remove function */
+#define MDL_START
 #if defined(MDL_START) 
   /* Function: mdlStart =======================================================
    * Abstract:
@@ -142,6 +252,7 @@ static void mdlInitializeSampleTimes(SimStruct *S)
    */
   static void mdlStart(SimStruct *S)
   {
+    reset_controller_state();
   }
 #endif /*  MDL_START */
 /* Function: mdlOutputs =======================================================
@@ -175,6 +286,9 @@ static void mdlOutputs(SimStruct *S, int_T tid)
         grid_side.ref.Q_reactive_power_ref   = para2[0];
         grid_side.ref.voltage_ref            = para3[0];
         motor.ref.voltage_ref                = para4[0];
+        system_Time                          = Input(15);
+        motor.ref.dvc_enable                  = (system_Time >= PRESYN_SWITCH_TIME) ? 1 : 0;
+        motor.ref.active_power_ref            = vloop_slope.Out;
         
         motor.bak.Ia1                  = Input(0);
         motor.bak.Ib1                  = Input(1);
@@ -199,7 +313,6 @@ static void mdlOutputs(SimStruct *S, int_T tid)
         grid_side.bak.pcc_Ia               = Input(12);
         grid_side.bak.pcc_Ib               = Input(13);
         grid_side.bak.pcc_Ic               = Input(14);
-        system_Time                        = Input(15);
         grid_side.bak.Udc1  = motor.bak.Udc1;
        // if(system_Time >0.15)
         {
@@ -350,7 +463,8 @@ static void mdlOutputs(SimStruct *S, int_T tid)
     OutPut[27] = grid_side.val.grid_phase_angle;
     
     OutPut[28] = grid_side.val.Pre_syn;  
-    OutPut[29] = grid_side.val.Iq;
+    /* Diagnostic probe: MSC q-axis current reference. */
+    OutPut[29] = motor.val.Iq_ref;
 }
 #undef MDL_UPDATE  /* Change to #undef to remove function */
 #if defined(MDL_UPDATE)
@@ -377,6 +491,123 @@ static void mdlOutputs(SimStruct *S, int_T tid)
   {
   }
 #endif /* MDL_DERIVATIVES */
+
+#define MDL_OPERATING_POINT
+#if defined(MDL_OPERATING_POINT) && defined(MATLAB_MEX_FILE)
+static mxArray *mdlGetOperatingPoint(SimStruct *S)
+{
+    const char *fields[] = {
+        "FPGAPWMTimerCounter1", "FPGAPWMTimerPeriod1",
+        "FPGAPWMTimerIntruptIndex1", "PwmPulseSate1",
+        "FPGAPWMTimerCounter2", "FPGAPWMTimerPeriod2",
+        "FPGAPWMTimerIntruptIndex2", "PwmPulseSate2",
+        "ControlTimerCounter", "ControlTimerPeriod",
+        "ControlTimerEnable", "ControlTimerFlag",
+        "ControlTimerIntruptIndex", "Ts_control", "PWMSegmentNumber",
+        "vector", "vector1", "system_Time", "svpwm1", "svpwm2", "motor",
+        "vloop_slope", "d_loop_pi", "q_loop_pi", "d_voltage_loop_pi",
+        "q_voltage_loop_pi", "PLL_loop_pi", "E_voltage_loop_pi",
+        "power_loop_pi", "clack_trans", "park_u", "park_PLL", "grid_side",
+        "lpf", "lpf1", "hpf", "bandpf", "w_vsg_state"
+    };
+    mxArray *snapshot = mxCreateStructMatrix(1, 1, 38, fields);
+    float w_vsg_state = grid_side_get_w_vsg_state();
+    UNUSED_ARG(S);
+
+#define SNAPSHOT_FIELD(name) \
+    mxSetField(snapshot, 0, #name, snapshot_bytes(&(name), sizeof(name)))
+    SNAPSHOT_FIELD(FPGAPWMTimerCounter1);
+    SNAPSHOT_FIELD(FPGAPWMTimerPeriod1);
+    SNAPSHOT_FIELD(FPGAPWMTimerIntruptIndex1);
+    SNAPSHOT_FIELD(PwmPulseSate1);
+    SNAPSHOT_FIELD(FPGAPWMTimerCounter2);
+    SNAPSHOT_FIELD(FPGAPWMTimerPeriod2);
+    SNAPSHOT_FIELD(FPGAPWMTimerIntruptIndex2);
+    SNAPSHOT_FIELD(PwmPulseSate2);
+    SNAPSHOT_FIELD(ControlTimerCounter);
+    SNAPSHOT_FIELD(ControlTimerPeriod);
+    SNAPSHOT_FIELD(ControlTimerEnable);
+    SNAPSHOT_FIELD(ControlTimerFlag);
+    SNAPSHOT_FIELD(ControlTimerIntruptIndex);
+    SNAPSHOT_FIELD(Ts_control);
+    SNAPSHOT_FIELD(PWMSegmentNumber);
+    SNAPSHOT_FIELD(vector);
+    SNAPSHOT_FIELD(vector1);
+    SNAPSHOT_FIELD(system_Time);
+    SNAPSHOT_FIELD(svpwm1);
+    SNAPSHOT_FIELD(svpwm2);
+    SNAPSHOT_FIELD(motor);
+    SNAPSHOT_FIELD(vloop_slope);
+    SNAPSHOT_FIELD(d_loop_pi);
+    SNAPSHOT_FIELD(q_loop_pi);
+    SNAPSHOT_FIELD(d_voltage_loop_pi);
+    SNAPSHOT_FIELD(q_voltage_loop_pi);
+    SNAPSHOT_FIELD(PLL_loop_pi);
+    SNAPSHOT_FIELD(E_voltage_loop_pi);
+    SNAPSHOT_FIELD(power_loop_pi);
+    SNAPSHOT_FIELD(clack_trans);
+    SNAPSHOT_FIELD(park_u);
+    SNAPSHOT_FIELD(park_PLL);
+    SNAPSHOT_FIELD(grid_side);
+    SNAPSHOT_FIELD(lpf);
+    SNAPSHOT_FIELD(lpf1);
+    SNAPSHOT_FIELD(hpf);
+    SNAPSHOT_FIELD(bandpf);
+    SNAPSHOT_FIELD(w_vsg_state);
+#undef SNAPSHOT_FIELD
+    return snapshot;
+}
+
+static void mdlSetOperatingPoint(SimStruct *S, const mxArray *snapshot)
+{
+    float w_vsg_state;
+
+#define RESTORE_FIELD(name) \
+    if (!restore_bytes(S, snapshot, #name, &(name), sizeof(name))) return
+    RESTORE_FIELD(FPGAPWMTimerCounter1);
+    RESTORE_FIELD(FPGAPWMTimerPeriod1);
+    RESTORE_FIELD(FPGAPWMTimerIntruptIndex1);
+    RESTORE_FIELD(PwmPulseSate1);
+    RESTORE_FIELD(FPGAPWMTimerCounter2);
+    RESTORE_FIELD(FPGAPWMTimerPeriod2);
+    RESTORE_FIELD(FPGAPWMTimerIntruptIndex2);
+    RESTORE_FIELD(PwmPulseSate2);
+    RESTORE_FIELD(ControlTimerCounter);
+    RESTORE_FIELD(ControlTimerPeriod);
+    RESTORE_FIELD(ControlTimerEnable);
+    RESTORE_FIELD(ControlTimerFlag);
+    RESTORE_FIELD(ControlTimerIntruptIndex);
+    RESTORE_FIELD(Ts_control);
+    RESTORE_FIELD(PWMSegmentNumber);
+    RESTORE_FIELD(vector);
+    RESTORE_FIELD(vector1);
+    RESTORE_FIELD(system_Time);
+    RESTORE_FIELD(svpwm1);
+    RESTORE_FIELD(svpwm2);
+    RESTORE_FIELD(motor);
+    RESTORE_FIELD(vloop_slope);
+    RESTORE_FIELD(d_loop_pi);
+    RESTORE_FIELD(q_loop_pi);
+    RESTORE_FIELD(d_voltage_loop_pi);
+    RESTORE_FIELD(q_voltage_loop_pi);
+    RESTORE_FIELD(PLL_loop_pi);
+    RESTORE_FIELD(E_voltage_loop_pi);
+    RESTORE_FIELD(power_loop_pi);
+    RESTORE_FIELD(clack_trans);
+    RESTORE_FIELD(park_u);
+    RESTORE_FIELD(park_PLL);
+    RESTORE_FIELD(grid_side);
+    RESTORE_FIELD(lpf);
+    RESTORE_FIELD(lpf1);
+    RESTORE_FIELD(hpf);
+    RESTORE_FIELD(bandpf);
+    RESTORE_FIELD(w_vsg_state);
+#undef RESTORE_FIELD
+    grid_side_set_w_vsg_state(w_vsg_state);
+    rebind_controller_callbacks();
+}
+#endif
+
 /* Function: mdlTerminate =====================================================
  * Abstract:
  *    In this function, you should perform any actions that are necessary

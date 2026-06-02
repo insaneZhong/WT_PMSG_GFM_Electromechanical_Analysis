@@ -46,10 +46,56 @@ MOTOR_HIGH_PASS_FILTER   hpf;
 MOTOR_BAND_PASS_FILTER   bandpf;
 static float w_vsg_state = VSG_EQUIV_W0;
 
+float grid_side_get_w_vsg_state(void)
+{
+    return w_vsg_state;
+}
+
+void grid_side_set_w_vsg_state(float value)
+{
+    w_vsg_state = value;
+}
+
 void motor_low_pass_filter(MOTOR_LOW_PASS_FILTER *v);
 void motor_high_pass_filter(MOTOR_HIGH_PASS_FILTER *v);
 void motor_band_pass_filter(MOTOR_BAND_PASS_FILTER *v);
 void motor_band_pass_filter1(MOTOR_BAND_PASS_FILTER *v);
+
+void grid_side_reset(void)
+{
+    MOTOR_SLOPE_LIMIT vloop_slope_defaults = {0};
+    MOTOR_PI d_loop_pi_defaults = CURRENT_PI_ID_DEFAULTS;
+    MOTOR_PI q_loop_pi_defaults = CURRENT_PI_IQ_DEFAULTS;
+    MOTOR_PI d_voltage_loop_pi_defaults = VOLTAGE_LOOP_PI_DEFAULTS;
+    MOTOR_PI q_voltage_loop_pi_defaults = VOLTAGE_LOOP_PI_DEFAULTS;
+    MOTOR_PI PLL_loop_pi_defaults = PLL_LOOP_PI_DEFAULTS;
+    MOTOR_PI E_voltage_loop_pi_defaults = E_VOLTAGE_LOOP_PI_DEFAULTS;
+    MOTOR_PI power_loop_pi_defaults = POWER_LOOP_PI_DEFAULTS;
+    CLACK clack_trans_defaults = {0};
+    PARK park_u_defaults = {0};
+    GRID_SIDE_INV grid_side_defaults = GRID_SIDE_INV_DEFAULTS;
+    MOTOR_LOW_PASS_FILTER lpf_defaults = {0};
+    MOTOR_HIGH_PASS_FILTER hpf_defaults = {0};
+    MOTOR_BAND_PASS_FILTER bandpf_defaults = {0};
+
+    vloop_slope = vloop_slope_defaults;
+    d_loop_pi = d_loop_pi_defaults;
+    q_loop_pi = q_loop_pi_defaults;
+    d_voltage_loop_pi = d_voltage_loop_pi_defaults;
+    q_voltage_loop_pi = q_voltage_loop_pi_defaults;
+    PLL_loop_pi = PLL_loop_pi_defaults;
+    E_voltage_loop_pi = E_voltage_loop_pi_defaults;
+    power_loop_pi = power_loop_pi_defaults;
+    clack_trans = clack_trans_defaults;
+    park_u = park_u_defaults;
+    park_PLL = park_u_defaults;
+    grid_side = grid_side_defaults;
+    lpf = lpf_defaults;
+    lpf1 = lpf_defaults;
+    hpf = hpf_defaults;
+    bandpf = bandpf_defaults;
+    w_vsg_state = VSG_EQUIV_W0;
+}
 
 //##########################################################################################################
 //                             网侧整流器控制主程序
@@ -57,8 +103,8 @@ void motor_band_pass_filter1(MOTOR_BAND_PASS_FILTER *v);
 void grid_side_control(GRID_SIDE_INV *p)
 {	
     
-    if (  system_Time < PRESYN_SWITCH_TIME     ) p->val.Pre_syn = 0;
-    if (  system_Time > PRESYN_SWITCH_TIME     ) p->val.Pre_syn = 1;
+    /* Deterministic pre-synchronization state update to avoid startup chattering. */
+    p->val.Pre_syn = (system_Time >= PRESYN_SWITCH_TIME) ? 1 : 0;
     /* steady-state validation: keep active-power reference constant */
 
 //##########################################################################################################
@@ -159,7 +205,7 @@ void grid_side_control(GRID_SIDE_INV *p)
       {
           vloop_slope.Ts    = p->Ts;
           vloop_slope.Init = 0;
-          vloop_slope.In    = p->ref.P_active_power_ref; 
+          vloop_slope.In    = p->ref.P_active_power_ref;
           vloop_slope.Slope = GSI_PREF_RAMP_SLOPE;
           motor_slope_limit_calc(&vloop_slope);  
 

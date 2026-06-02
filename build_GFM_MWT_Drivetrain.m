@@ -37,6 +37,8 @@ addSignalSink(mdl, 'omega_t', [1160 330 1255 350]);
 addSignalSink(mdl, 'omega_g', [1160 370 1255 390]);
 addSignalSink(mdl, 'theta_tw', [1160 410 1255 430]);
 addSignalSink(mdl, 'T_sh', [1160 450 1255 470]);
+addSignalSink(mdl, 'T_e', [1160 490 1255 510]);
+addSignalSink(mdl, 'T_aero', [1160 530 1255 550]);
 
 bus = find_system(mdl, 'SearchDepth', 1, 'BlockType', 'BusSelector');
 assert(~isempty(bus), 'Top-level PMSM Bus Selector was not found.');
@@ -64,6 +66,8 @@ connectOutput(mdl, drvPorts.Outport(1), 'omega_t');
 connectOutput(mdl, drvPorts.Outport(2), 'omega_g');
 connectOutput(mdl, drvPorts.Outport(3), 'theta_tw');
 connectOutput(mdl, drvPorts.Outport(4), 'T_sh');
+connectOutput(mdl, busPorts.Outport(6), 'T_e');
+connectOutput(mdl, drvPorts.Outport(5), 'T_aero');
 
 set_param([mdl '/0speed1torque'], 'Value', '0');
 set_param(mdl, 'SimulationCommand', 'update');
@@ -90,6 +94,7 @@ add_block('simulink/Sinks/Out1', [drv '/omega_t'], 'Port', '1', 'Position', [735
 add_block('simulink/Sinks/Out1', [drv '/omega_g'], 'Port', '2', 'Position', [735 110 765 130]);
 add_block('simulink/Sinks/Out1', [drv '/theta_tw'], 'Port', '3', 'Position', [735 180 765 200]);
 add_block('simulink/Sinks/Out1', [drv '/T_sh'], 'Port', '4', 'Position', [735 250 765 270]);
+add_block('simulink/Sinks/Out1', [drv '/T_aero_meas'], 'Port', '5', 'Position', [735 320 765 340]);
 
 % Aerodynamic torque: Taero0 + Kv*(vw-vw0) - Daero*(omega_t-omega0).
 add_block('simulink/Sources/Constant', [drv '/v_w0'], 'Value', 'v_w0', 'Position', [75 70 110 90]);
@@ -138,6 +143,7 @@ add_line(drv, 'Omega_t_State/1', 'Delta_omega_t/1');
 add_line(drv, 'omega_m0_t/1', 'Delta_omega_t/2');
 add_line(drv, 'Delta_omega_t/1', 'D_aero/1');
 add_line(drv, 'D_aero/1', 'T_aero/3');
+add_line(drv, 'T_aero/1', 'T_aero_meas/1');
 
 % Shaft and turbine dynamics.
 add_line(drv, 'Omega_t_State/1', 'Delta_omega_sh/1');

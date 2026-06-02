@@ -1,0 +1,5 @@
+Model,MSC,GSC,CausalRole
+GFL-WT,MSC-MPPT,GSC-DVC + PLL,baseline
+GFM-GWT,MSC-MPPT,GSC-DVC + GFM,pll_to_gfm
+GFM-MWT,MSC-DVC,GSC-GFM,dc_control_shift
+GFM-MWT+AD,MSC-DVC,GSC-GFM + APCAD,add_damping

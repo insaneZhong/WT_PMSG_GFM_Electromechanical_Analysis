@@ -18,7 +18,7 @@ origCtrl = get_param(ctrlBlk, 'MaskValues');
 origBrk = get_param(brkBlk, 'MaskValues');
 
 prefList = [5e5, 1.0e6];
-vdcList = [5000, 5500];
+vdcList = [1200, 1250];
 breakerModes = {'sync', 'forced_closed'};
 
 rows = {};

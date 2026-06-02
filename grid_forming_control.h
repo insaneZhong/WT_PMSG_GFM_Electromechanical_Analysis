@@ -5,7 +5,7 @@
 #define   GRID_FILTER__C                        0.000055     //  55uF
 #define   GRID_LINE_impedance__L                0.0005    //0.5mH
 #define   GRID__RS                              0.0002
-#define   GRID_UDC__C                           0.0015      
+#define   GRID_UDC__C                           0.03      
 #ifndef PRESYN_SWITCH_TIME
 #define   PRESYN_SWITCH_TIME                    0.5
 #endif
@@ -62,7 +62,7 @@
 #define   GSI_PLOOP_KI                        2e-5
 #endif
 #ifndef GSI_PREF_RAMP_SLOPE
-#define   GSI_PREF_RAMP_SLOPE                 5000000.0f
+#define   GSI_PREF_RAMP_SLOPE                 2000000
 #endif
 #ifndef GSI_PF_LOOP_SIGN
 /* For inverter power export: Pref-Pmeas > 0 should advance the internal
@@ -111,7 +111,7 @@ typedef     struct     {float	    Ts;
                                0, 5.86, 0.0, 0,\
                                0, 0, 0.0, 0.0, \
                                0.0, 0.0,  1.15, 0,0.0, 0.0}    
- #define POWER_LOOP_PI_DEFAULTS   {0.0, 0.0, 0.0, 1e-06, 2e-05, 0.0, 0,\
+ #define POWER_LOOP_PI_DEFAULTS   {0.0, 0.0, 0.0, GSI_PLOOP_KP, GSI_PLOOP_KI, 0.0, 0,\
                                0, 0, 0.0, 0.0, \
                                0.0, 0.0,  GSI_PLOOP_OUT_MAX, GSI_PLOOP_OUT_MIN,0.0, 0.0}    
 //##########################################################################################################
@@ -295,6 +295,9 @@ typedef struct  MOTOR_BAND_PASS_FILTER_DEF {
  extern MOTOR_BAND_PASS_FILTER  bandpf;  
 
 void grid_side_control(GRID_SIDE_INV *p);
+void grid_side_reset(void);
+float grid_side_get_w_vsg_state(void);
+void grid_side_set_w_vsg_state(float value);
 
 #endif
 

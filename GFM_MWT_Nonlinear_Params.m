@@ -29,7 +29,7 @@ end
 
 J_g = 1.83750e5;              % kg*m^2
 J_t = 8.0 * J_g;              % kg*m^2, provisional if not inherited
-f_sh_init_guess = 2.0;        % Hz, provisional initialization guess
+f_sh_init_guess = 1.0;        % Hz, provisional placeholder only (nonlinear ID is data-driven)
 zeta_sh_init_guess = 0.010;   % pu, provisional shaft damping
 
 J_eq = J_t * J_g / (J_t + J_g);
@@ -75,6 +75,17 @@ elseif evalin('base','exist(''P_wt_rated_override'',''var'')')
     P_wt_rated = evalin('base','P_wt_rated_override');
 end
 
+% Rebuild the mechanical equilibrium after all power/speed overrides.
+% This prevents a stale 30 rpm torque from surviving after omega_m0 is
+% aligned to the 150 rpm small-signal operating point.
+T_e0 = P_wt_rated / omega_m0;
+T_aero0 = T_e0;
+theta_tw0 = T_e0 / K_sh;
+D_aero = T_aero0 / omega_m0;
+K_v_aero = 3 * T_aero0 / v_w0;
+D_t = 0.005 * D_aero;
+D_g = 0.005 * D_aero;
+
 wind_step_time = 1.50;                                % s
 wind_step_mps = 0.00;                                 % m/s, no-disturbance stage
 mech_log_decimation = 100;                            % at Ts=1 us
@@ -107,3 +118,14 @@ param_sync_info = struct( ...
     'D_aero', D_aero, ...
     'K_v_aero', K_v_aero);
 
+% Simulink block parameters are resolved from the base workspace even when
+% this initialization script is called from a diagnostic function.
+model_param_names = { ...
+    'P_wt_rated', 'omega_m0', 'v_w0', 'J_t', 'J_g', 'K_sh', 'D_sh', ...
+    'D_t', 'D_g', 'T_e0', 'T_aero0', 'theta_tw0', 'D_aero', 'K_v_aero', ...
+    'wind_step_time', 'wind_step_mps', 'mech_log_decimation', ...
+    'frequency_estimation_start', 'sim_stop_time', 'param_sync_info'};
+for model_param_index = 1:numel(model_param_names)
+    model_param_name = model_param_names{model_param_index};
+    assignin('base', model_param_name, eval(model_param_name));
+end

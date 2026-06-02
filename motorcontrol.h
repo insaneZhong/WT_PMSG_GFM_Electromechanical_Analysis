@@ -10,7 +10,7 @@
 #define   MOTOR_BW                       0.001
 #define   System_frequcncy               0.00025
 
-#define   GRID_UDC__C  0.0015
+#define   GRID_UDC__C                           0.03
 
 #define   MOTOR_ID_LIMIT_MAX                         1500     
 #define   MOTOR_IQ_LIMIT_MAX                         1500      
@@ -36,15 +36,19 @@
 #define   MOTOR_PI_IQ_OUT_MIN                 -700
 
 #define   SPEED_LOOP_BANDWITH                  12   //Hz, reduced for no-disturbance steady-state convergence
-#define   MOTOR_PWM_SPEED_KP                   0.24
-#define   MOTOR_PWM_SPEED_KI                   0.0024
+#define   MOTOR_PWM_SPEED_KP                  0.10  
+#define   MOTOR_PWM_SPEED_KI                  0.0007
 #define	  MOTOR_PWM_SPEED_KC                   0.00001
 #define	  MOTOR_PWM_SPEED_KD                   0.000001
 #define   MOTOR_PWM_SPEED_PI_OUT_MAX           MOTOR_IQ_LIMIT_MAX    //输出为电流,
 #define   MOTOR_PWM_SPEED_PI_OUT_MIN          -MOTOR_IQ_LIMIT_MAX    //输出为电流,
+/* MSC-DVC startup coordination:
+ * convert the staged GSC active-power command into a generator q-axis
+ * current feedforward. The direct DC-voltage PI remains the correction path. */
+#define   MOTOR_IQ_POWER_FF_A_PER_W           0.0002
 
 
-#define   V_LOOP_BANDWITH             30   //Hz
+#define   V_LOOP_BANDWITH                     5   // Hz, MSC DC-link loop
 #define	  V_LOOP_KP                   GRID_UDC__C * V_LOOP_BANDWITH * 2 *3.1415926
 #define   V_LOOP_KI                    V_LOOP_KP/ 0.01 *0.00025
 
@@ -215,10 +219,12 @@ struct  MOTOR_PARAM_INIT       {short                  Polar                 ; /
 //##########################################################################################################
 //##########################################################################################################
 //****************电机给定***************************************************
-struct   MOTOR_REF             {float  voltage_ref;						  							  	
+struct   MOTOR_REF             {float  voltage_ref;
+                                float  active_power_ref;
+                                unsigned short dvc_enable;
 							   };
 
-#define  MOTOR_REF_DEFAULTS         {0}
+#define  MOTOR_REF_DEFAULTS         {0, 0, 0}
 
 //##########################################################################################################
 //##########################################################################################################

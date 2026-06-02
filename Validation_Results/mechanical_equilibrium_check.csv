@@ -1,0 +1,2 @@
+omega_m0_radps,T_aero0_Nm,T_e0_generation_Nm,theta_tw0_rad,turbine_initial_accel_radps2,generator_initial_accel_radps2,theta_initial_rate_radps,max_abs_omega_t_drift_radps,max_abs_omega_g_drift_radps,max_abs_theta_tw_drift_rad,max_abs_T_sh_drift_Nm,equilibrium_pass
+3.14159265358979,318309.886183791,-318309.886183791,0.0123411483800508,0,0,0,0,0,0,0,1

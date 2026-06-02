@@ -14,7 +14,7 @@ cd(root);
 pref = 1.0e6;
 qref = 0;
 vacRef = 563;
-vdcRef = 5000;
+vdcRef = 1200;
 simStop = 3.0;
 
 if nargin < 1 || isempty(mode)

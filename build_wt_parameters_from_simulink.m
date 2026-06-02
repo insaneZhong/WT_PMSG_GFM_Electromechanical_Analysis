@@ -13,18 +13,18 @@ run(fullfile(rootDir, 'GFM_MWT_Nonlinear_Params.m'));
 load_system('Grid_Forming_PMSG');
 
 sim = struct();
-sim.omega_m0 = localEvalBase('omega_m0');
-sim.v_w0 = localEvalBase('v_w0');
-sim.theta_tw0 = localEvalBase('theta_tw0');
-sim.J_t = localEvalBase('J_t');
-sim.J_g = localEvalBase('J_g');
-sim.K_sh = localEvalBase('K_sh');
-sim.D_sh = localEvalBase('D_sh');
-sim.D_t = localEvalBase('D_t');
-sim.D_g = localEvalBase('D_g');
-sim.D_aero = localEvalBase('D_aero');
-sim.K_v_aero = localEvalBase('K_v_aero');
-sim.T_aero0 = localEvalBase('T_aero0');
+sim.omega_m0 = omega_m0;
+sim.v_w0 = v_w0;
+sim.theta_tw0 = theta_tw0;
+sim.J_t = J_t;
+sim.J_g = J_g;
+sim.K_sh = K_sh;
+sim.D_sh = D_sh;
+sim.D_t = D_t;
+sim.D_g = D_g;
+sim.D_aero = D_aero;
+sim.K_v_aero = K_v_aero;
+sim.T_aero0 = T_aero0;
 
 names = { ...
     'omega_g0/omega_m0', ...
@@ -100,14 +100,6 @@ fclose(fid);
 disp(T);
 fprintf('Saved: %s\n', fullfile(outDir, 'same_object_wt_from_simulink.csv'));
 fprintf('Saved: %s\n', md);
-end
-
-function v = localEvalBase(varName)
-try
-    v = evalin('base', varName);
-catch
-    v = NaN;
-end
 end
 
 function v = getf(s, name, fallback)

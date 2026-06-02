@@ -1,0 +1,2 @@
+timestamp,simStop,PrefRamp_Wps,Ppcc_mean,Ppcc_err_pu,Udc_mean,Udc_slope,Udc_pp,T_sh_pp,omega_g_slope,omega_t_slope,theta_tw_slope,flag_1MW,flag_dc_settled,flag_mech_settled,flag_baseline_operational
+2026-06-02 15:23:55,12,1000000,990004.233983165,-0.00999576601683535,953.237731189375,6.22012926463973,72.5234325442437,197932.298906302,0.021413496920389,-0.0091740630407897,0.00285123806157222,1,0,0,1
