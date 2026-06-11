@@ -110,12 +110,12 @@ APCAD 已使目标扭振模态的阻尼比提高约 `118%`，但两个模型在�
 | 文件 | 内容 |
 | --- | --- |
 | `Scan_GFM_Control_Parameters.mlx` | 可直接执行的控制参数扫描主程序 |
-| `Control_Parameter_Scan_Results/baseline_control_parameter_metrics.csv` | 基准指标 |
-| `Control_Parameter_Scan_Results/baseline_mode_participation_top10.csv` | 主导慢模态和扭振模态参与因子 |
-| `Control_Parameter_Scan_Results/paired_parameter_scan_results.csv` | 三组二维参数完整数据 |
-| `Control_Parameter_Scan_Results/kdamp_scan_results.csv` | APCAD 增益扫描数据 |
-| `Control_Parameter_Scan_Results/parameter_scan_summary.csv` | 扫描汇总 |
-| `Control_Parameter_Scan_Results/h_mp_stability_maps.png` | `h-mp` 稳定域及阻尼图 |
-| `Control_Parameter_Scan_Results/dvc_stability_maps.png` | DVC 参数稳定域及阻尼图 |
-| `Control_Parameter_Scan_Results/rpc_stability_maps.png` | RPC 参数稳定域及阻尼图 |
-| `Control_Parameter_Scan_Results/kdamp_scan.png` | APCAD 增益曲线 |
+| `Results/Control_Parameter_Scan_Results/baseline_control_parameter_metrics.csv` | 基准指标 |
+| `Results/Control_Parameter_Scan_Results/baseline_mode_participation_top10.csv` | 主导慢模态和扭振模态参与因子 |
+| `Results/Control_Parameter_Scan_Results/paired_parameter_scan_results.csv` | 三组二维参数完整数据 |
+| `Results/Control_Parameter_Scan_Results/kdamp_scan_results.csv` | APCAD 增益扫描数据 |
+| `Results/Control_Parameter_Scan_Results/parameter_scan_summary.csv` | 扫描汇总 |
+| `Results/Control_Parameter_Scan_Results/h_mp_stability_maps.png` | `h-mp` 稳定域及阻尼图 |
+| `Results/Control_Parameter_Scan_Results/dvc_stability_maps.png` | DVC 参数稳定域及阻尼图 |
+| `Results/Control_Parameter_Scan_Results/rpc_stability_maps.png` | RPC 参数稳定域及阻尼图 |
+| `Results/Control_Parameter_Scan_Results/kdamp_scan.png` | APCAD 增益曲线 |

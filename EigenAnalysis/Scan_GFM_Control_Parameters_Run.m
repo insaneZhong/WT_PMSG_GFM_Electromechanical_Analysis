@@ -28,7 +28,7 @@ ad_file = load("Unified_WT_PMSG_VSG_Damping.mat");
 gfm = gfm_file.Unified_GFMI;
 ad = ad_file.Unified_GFMI;
 
-result_dir = fullfile(this_dir, 'Control_Parameter_Scan_Results');
+result_dir = fullfile(this_dir, 'Results', 'Control_Parameter_Scan_Results');
 if ~exist(result_dir, 'dir')
     mkdir(result_dir);
 end

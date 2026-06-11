@@ -52,6 +52,6 @@
 - 模型：`../Generate_SSM/WT_PMSG_GFM_GWT_Model.mlx`
 - 四拓扑比较：`Compare_Control_Mode_Four_Topologies.mlx`
 - GFM-GWT 直流环筛选：`Tune_GFM_GWT_DVC.mlx`
-- 基准结果：`Control_Mode_Comparison_Results/baseline_torsional_modes.csv`
-- 因果增量：`Control_Mode_Comparison_Results/causal_baseline_deltas.csv`
-- 工况扫描：`Control_Mode_Comparison_Results/common_condition_sweeps.csv`
+- 基准结果：`Results/Control_Mode_Comparison_Results/baseline_torsional_modes.csv`
+- 因果增量：`Results/Control_Mode_Comparison_Results/causal_baseline_deltas.csv`
+- 工况扫描：`Results/Control_Mode_Comparison_Results/common_condition_sweeps.csv`

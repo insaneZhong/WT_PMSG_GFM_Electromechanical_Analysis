@@ -1,0 +1,3 @@
+Factor,FromModel,ToModel,DeltaDampingRatio,DeltaSigma,DeltaMaxReal
+DVC type effect (Type a to Type c),GFM-MWT-TypeA,GFM-MWT-TypeC,3.91680614222362e-05,-0.000492705028656282,-0.000492705028656282
+APCAD damping effect after Type c,GFM-MWT-TypeC,GFM-MWT-TypeC+AD,0.0252952784047947,-0.314625105758368,-0.314625105758368

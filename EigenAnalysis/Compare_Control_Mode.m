@@ -32,7 +32,7 @@ models = struct( ...
     'data', {gfl.Unified_GFMI, gfm_gwt.Unified_GFMI, gfm.Unified_GFMI, gfm_damp.Unified_GFMI}, ...
     'color', {[0.05 0.42 0.62], [0.91 0.60 0.10], [0.78 0.28 0.18], [0.12 0.55 0.34]});
 
-result_dir = fullfile(this_dir, 'Control_Mode_Comparison_Results');
+result_dir = fullfile(this_dir, 'Results', 'Control_Mode_Comparison_Results');
 if ~exist(result_dir, 'dir')
     mkdir(result_dir);
 end

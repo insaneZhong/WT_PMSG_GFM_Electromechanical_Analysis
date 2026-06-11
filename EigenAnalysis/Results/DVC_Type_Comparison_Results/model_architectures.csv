@@ -1,0 +1,4 @@
+Model,MSC,GSC,CausalRole
+GFM-MWT-TypeA,MSC-DVC Type a,GSC-GFM,DC-voltage feedback only
+GFM-MWT-TypeC,MSC-DVC Type c,GSC-GFM,Add output-power feedforward
+GFM-MWT-TypeC+AD,MSC-DVC Type c,GSC-GFM + APCAD,Add damping after Type-c baseline

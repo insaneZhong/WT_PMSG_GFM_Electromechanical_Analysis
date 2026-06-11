@@ -40,7 +40,7 @@ definitions = struct( ...
     'values', {gfm_default(1)*factor, gfm_default(2)*factor, ...
                gfm_default(3)*factor, gfm_default(4)*factor, linspace(-1.5e7, 5e6, 121)});
 
-result_dir = fullfile(this_dir, 'Mode_Trajectory_Results');
+result_dir = fullfile(this_dir, 'Results', 'Mode_Trajectory_Results');
 if ~exist(result_dir, 'dir')
     mkdir(result_dir);
 end

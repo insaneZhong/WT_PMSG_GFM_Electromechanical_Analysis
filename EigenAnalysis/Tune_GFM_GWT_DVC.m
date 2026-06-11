@@ -39,7 +39,7 @@ for p = 1:numel(polarity)
     end
 end
 
-result_dir = fullfile(this_dir, 'Control_Mode_Comparison_Results');
+result_dir = fullfile(this_dir, 'Results', 'Control_Mode_Comparison_Results');
 if ~exist(result_dir, 'dir')
     mkdir(result_dir);
 end

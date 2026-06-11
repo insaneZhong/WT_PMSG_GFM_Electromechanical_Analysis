@@ -1,8 +1,9 @@
-%% Four-Topology Causal Comparison for WT-PMSG Electromechanical Torsion
-% Compares GFL-WT, GFM-GWT, GFM-MWT and GFM-MWT+AD so synchronization,
-% DC-link control allocation and added damping can be separated.
-% All cases share the turbine, drivetrain, PMSG, DC link, filter, grid
-% operating point and network sweep variables.
+%% MSC-DVC Type-a / Type-c Comparison for WT-PMSG Electromechanical Torsion
+% Compares the same GFM-MWT plant with two machine-side DC-link voltage
+% control implementations:
+%   Type a: Delta i_m_q_ref = G_dvc(s)*Delta v_dc
+%   Type c: Delta i_m_q_ref = G_dvc(s)*Delta v_dc + K_ff*Delta p_m
+% Type c + APCAD is retained as the damping-control follow-up case.
 
 close all
 clear
@@ -20,28 +21,28 @@ run("Parameters.m");
 this_dir = pwd; % Parameters.m clears workspace variables after saving Parameters.mat.
 base_params = load("Parameters.mat");
 mpopt = mpoption('verbose', 0, 'out.all', 0);
+generated_model_dir = fullfile(this_dir, 'Generated_Models');
 
-gfl = load("Unified_WT_PMSG_GFL.mat");
-gfm_gwt = load("Unified_WT_PMSG_GFM_GWT.mat");
-gfm = load("Unified_WT_PMSG_VSG.mat");
-gfm_damp = load("Unified_WT_PMSG_VSG_Damping.mat");
+gfm_typea = load_model_mat(this_dir, generated_model_dir, "Unified_WT_PMSG_VSG_TypeA.mat");
+gfm_typec = load_model_mat(this_dir, generated_model_dir, "Unified_WT_PMSG_VSG_TypeC.mat");
+gfm_typec_damp = load_model_mat(this_dir, generated_model_dir, "Unified_WT_PMSG_VSG_TypeC_Damping.mat");
 
 models = struct( ...
-    'key', {"GFL", "GFM_GWT", "GFM_MWT", "GFM_MWT_AD"}, ...
-    'label', {"GFL-WT", "GFM-GWT", "GFM-MWT", "GFM-MWT+AD"}, ...
-    'data', {gfl.Unified_GFMI, gfm_gwt.Unified_GFMI, gfm.Unified_GFMI, gfm_damp.Unified_GFMI}, ...
-    'color', {[0.05 0.42 0.62], [0.91 0.60 0.10], [0.78 0.28 0.18], [0.12 0.55 0.34]});
+    'key', {"GFM_MWT_TypeA", "GFM_MWT_TypeC", "GFM_MWT_TypeC_AD"}, ...
+    'label', {"GFM-MWT-TypeA", "GFM-MWT-TypeC", "GFM-MWT-TypeC+AD"}, ...
+    'data', {gfm_typea.Unified_GFMI, gfm_typec.Unified_GFMI, gfm_typec_damp.Unified_GFMI}, ...
+    'color', {[0.78 0.28 0.18], [0.05 0.42 0.62], [0.12 0.55 0.34]});
 
-result_dir = fullfile(this_dir, 'Results', 'Control_Mode_Comparison_Results');
+result_dir = fullfile(this_dir, 'Results', 'DVC_Type_Comparison_Results');
 if ~exist(result_dir, 'dir')
     mkdir(result_dir);
 end
 
 architectures = table( ...
     string({models.label}).', ...
-    ["MSC-MPPT"; "MSC-MPPT"; "MSC-DVC"; "MSC-DVC"], ...
-    ["GSC-DVC + PLL"; "GSC-DVC + GFM"; "GSC-GFM"; "GSC-GFM + APCAD"], ...
-    ["Reference baseline"; "Isolate PLL-to-GFM synchronization"; "Isolate DC-link control allocation"; "Isolate added damping control"], ...
+    ["MSC-DVC Type a"; "MSC-DVC Type c"; "MSC-DVC Type c"], ...
+    ["GSC-GFM"; "GSC-GFM"; "GSC-GFM + APCAD"], ...
+    ["DC-voltage feedback only"; "Add output-power feedforward"; "Add damping after Type-c baseline"], ...
     'VariableNames', {'Model', 'MSC', 'GSC', 'CausalRole'});
 writetable(architectures, fullfile(result_dir, 'model_architectures.csv'));
 
@@ -62,11 +63,10 @@ end
 writetable(baseline, fullfile(result_dir, 'baseline_torsional_modes.csv'));
 writetable(participation, fullfile(result_dir, 'baseline_torsional_participation_top10.csv'));
 
-stage_from = [1; 2; 3];
-stage_to = [2; 3; 4];
-stage_factor = ["Synchronization effect (PLL to GFM)"; ...
-                "DC-link allocation effect (GSC-DVC to MSC-DVC)"; ...
-                "APCAD damping effect"];
+stage_from = [1; 2];
+stage_to = [2; 3];
+stage_factor = ["DVC type effect (Type a to Type c)"; ...
+                "APCAD damping effect after Type c"];
 causal_baseline = table(stage_factor, baseline.Model(stage_from), baseline.Model(stage_to), ...
     baseline.DampingRatio(stage_to) - baseline.DampingRatio(stage_from), ...
     baseline.Sigma(stage_to) - baseline.Sigma(stage_from), ...
@@ -83,9 +83,9 @@ disp(participation);
 
 %% Common system-condition sweeps
 sweep_defs = struct( ...
-    'name', {"SCR", "XR", "C_dc"}, ...
-    'values', {logspace(log10(1.25), log10(25), 40), linspace(1, 20, 40), linspace(0.25*base_params.C_dc, 2*base_params.C_dc, 40)}, ...
-    'label', {"SCR", "X/R", "C_{dc} (F)"});
+    'name', {"SCR", "XR", "C_dc", "k_ff_msc_typec"}, ...
+    'values', {logspace(log10(1.25), log10(25), 40), linspace(1, 20, 40), linspace(0.25*base_params.C_dc, 2*base_params.C_dc, 40), linspace(0, 2*base_params.k_ff_msc_typec, 40)}, ...
+    'label', {"SCR", "X/R", "C_{dc} (F)", "K_{ff,MSC} (A/W)"});
 
 all_sweeps = table();
 for s = 1:numel(sweep_defs)
@@ -313,4 +313,18 @@ states = states(:);
 [sorted_pf, order] = sort(pf, 'descend');
 result = table(repmat(string(model_label), numel(order), 1), (1:numel(order)).', states(order), sorted_pf, ...
     'VariableNames', {'Model', 'Rank', 'State', 'Participation'});
+end
+
+function data = load_model_mat(this_dir, generated_model_dir, file_name)
+candidates = [
+    fullfile(generated_model_dir, file_name)
+    fullfile(this_dir, file_name)
+    ];
+for k = 1:numel(candidates)
+    if exist(candidates(k), 'file') == 2
+        data = load(candidates(k));
+        return;
+    end
+end
+error('Cannot find model MAT file: %s', file_name);
 end
