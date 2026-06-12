@@ -16,7 +16,10 @@ f_sample = 20e3;             % [USER/DESIGN] Control sampling frequency (Hz). Ma
 f_step = 100e3;              % [USER/DESIGN] Simulation calculation/update frequency (Hz). Match EMT step size.
 
 %% Inverter Ratings
-Vdc = 1.5e3;                 % [USER] Rated DC-link voltage (V), aligned with nonlinear model setup.
+Vdc = 1.5e3;                 % [USER] Rated DC-link voltage (V). Re-check against nonlinear VdcRef/initial voltage before final alignment.
+if exist('Vdc_override', 'var')
+    Vdc = Vdc_override;      % [USER/OVERRIDE] Optional reproducibility override for DC-link voltage sensitivity checks.
+end
 V_LL = 0.69e3;               % [USER] Rated AC line-to-line voltage (V), aligned with nonlinear model setup.
 S_base = 1e6;                % [TEMP/USER] Rated apparent power (VA). Current value is for a 1 MW-class test case.
 Zb = V_LL^2 / S_base;        % [DERIVED] Base impedance (Ohms), used for pu-to-SI conversion.
@@ -133,7 +136,10 @@ k_im = R_s / Tmsc;           % [DERIVED/DESIGN] MSC current-loop integral gain.
 k_pdc = 0.5;                 % [TEMP/DESIGN] DC-link voltage controller proportional gain. Needs retuning for target converter.
 k_idc = 50;                  % [TEMP/DESIGN] DC-link voltage controller integral gain. Needs retuning for target converter.
 k_ff_msc_typec = i_m_q0 / P_wt_rated; % [DERIVED/DESIGN/SWEEP] MSC-DVC Type-c active-power feedforward gain (A/W).
-C_dc = 1.5e-3;               % [USER] DC-link capacitance (F), aligned with nonlinear macro GRID_UDC__C.
+C_dc = 1.5e-3;               % [USER] DC-link capacitance (F). Current frozen small-signal baseline; nonlinear Cd is checked separately.
+if exist('C_dc_override', 'var')
+    C_dc = C_dc_override;    % [USER/OVERRIDE] Optional reproducibility override for nonlinear-alignment checks.
+end
 V_dc0 = Vdc;                 % [DERIVED] DC-link voltage operating point (V).
 
 %% Shaft Torsional Damping Controller

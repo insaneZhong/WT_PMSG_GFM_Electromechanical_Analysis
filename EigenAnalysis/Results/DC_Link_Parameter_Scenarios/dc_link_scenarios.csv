@@ -1,0 +1,4 @@
+Scenario,Vdc,C_dc,Meaning
+FrozenSmallSignal,1500,0.0015,Current frozen small-signal baseline
+NonlinearPhysicalInit,1200,0.03,Match nonlinear physical Cd initial voltage
+NonlinearValidationRef,1000,0.03,Match current nonlinear validation VdcRef and Cd

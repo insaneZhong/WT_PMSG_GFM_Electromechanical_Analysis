@@ -164,3 +164,6 @@ Type-a / Type-c 对照的当前结果：
 2. 改控制结构时，应新增模型标签和结果目录，不覆盖当前四拓扑基准。
 3. 非线性调参结果不得反向修改小信号冻结结论，除非发现小信号参数或模型结构存在明确错误。
 4. 论文写作中应区分三类证据：小信号特征值证据、线性小扰动响应证据、非线性 Simulink 时域/频域验证证据。
+# 2026-06-12 更新提示
+
+当前工作树已重新运行 `EigenAnalysis/Compare_Control_Mode_Run.m`，四拓扑扭振模态数值以 `SmallSignal_Current_Rerun_Baseline_20260612.md` 和 `Results/Control_Mode_Comparison_Results/baseline_torsional_modes.csv` 为准。本 2026-06-11 清单保留为历史冻结说明，不再作为最新数值来源。
