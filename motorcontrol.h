@@ -68,6 +68,12 @@
 #ifndef MOTOR_PI_IQ_OUT_MIN
 #define   MOTOR_PI_IQ_OUT_MIN                 -700
 #endif
+#ifndef MOTOR_IQ_PI_OUTPUT_SIGN
+#define   MOTOR_IQ_PI_OUTPUT_SIGN              1
+#endif
+#ifndef MOTOR_IQ_FEEDBACK_SIGN
+#define   MOTOR_IQ_FEEDBACK_SIGN               1
+#endif
 
 #define   SPEED_LOOP_BANDWITH                  12   //Hz, reduced for no-disturbance steady-state convergence
 #ifndef MOTOR_PWM_SPEED_KP

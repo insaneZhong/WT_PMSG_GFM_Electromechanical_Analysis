@@ -14,6 +14,8 @@ function compile_vsg_sfunction(varargin)
 %    MotorVoltLimit - MSC current-loop PI voltage limit, V
 %    DvcType - MSC-DVC structure selector: 1 = Type a, 3 = Type c.
 %    MotorCurrentKp/Ki - MSC dq current-loop PI gains
+%    MotorIqPiSign - diagnostic sign for MSC q-axis PI voltage output.
+%    MotorIqFeedbackSign - diagnostic sign for MSC q-axis current feedback.
 %    GridCurrentKp/Ki - GSC dq current-loop PI gains
 %    GridVoltageKp/Ki - GSC capacitor-voltage-loop PI gains
 %    GridPowerKp/Ki - legacy GSC P-f loop PI gains. These only affect
@@ -34,6 +36,7 @@ clear mex;
 cfg = struct('VSG_H', [], 'VSG_MP', [], 'MotorFF', [], 'MotorKp', [], 'MotorKi', [], ...
     'MotorKc', [], 'MotorVoltLimit', [], 'DvcType', [], ...
     'MotorCurrentKp', [], 'MotorCurrentKi', [], 'MotorCurrentKc', [], ...
+    'MotorIqPiSign', [], 'MotorIqFeedbackSign', [], ...
     'GridCurrentKp', [], 'GridCurrentKi', [], 'GridCurrentKc', [], ...
     'GridVoltageKp', [], 'GridVoltageKi', [], ...
     'GridPowerKp', [], 'GridPowerKi', [], ...
@@ -91,6 +94,18 @@ end
 if ~isempty(cfg.MotorCurrentKc)
     defs{end+1} = sprintf('-DMOTOR_ID_KC=%.12ef', cfg.MotorCurrentKc); %#ok<AGROW>
     defs{end+1} = sprintf('-DMOTOR_IQ_KC=%.12ef', cfg.MotorCurrentKc); %#ok<AGROW>
+end
+if ~isempty(cfg.MotorIqPiSign)
+    if ~ismember(cfg.MotorIqPiSign, [-1, 1])
+        error('MotorIqPiSign must be +1 or -1.');
+    end
+    defs{end+1} = sprintf('-DMOTOR_IQ_PI_OUTPUT_SIGN=%d', cfg.MotorIqPiSign); %#ok<AGROW>
+end
+if ~isempty(cfg.MotorIqFeedbackSign)
+    if ~ismember(cfg.MotorIqFeedbackSign, [-1, 1])
+        error('MotorIqFeedbackSign must be +1 or -1.');
+    end
+    defs{end+1} = sprintf('-DMOTOR_IQ_FEEDBACK_SIGN=%d', cfg.MotorIqFeedbackSign); %#ok<AGROW>
 end
 if ~isempty(cfg.GridCurrentKp)
     defs{end+1} = sprintf('-DCURRENT_ID_KP=%.12ef', cfg.GridCurrentKp); %#ok<AGROW>

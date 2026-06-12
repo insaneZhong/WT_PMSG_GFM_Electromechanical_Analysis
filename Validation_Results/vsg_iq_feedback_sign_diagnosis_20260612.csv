@@ -1,0 +1,2 @@
+MotorIqFeedbackSign,Udc_V,UdcSlope,Ppcc_W,PreSyn,MscModDepth,IqRef_A,Iq_A,IqErr_A,IqPiOut_V,Cause
+-1,5059.85421922144,-1581.75027444079,1007796.6926345,1,0.0751728886292727,1067.94125195312,-1159.66409240723,2227.60534436035,-300,dc_link_or_active_power_balance_not_settled

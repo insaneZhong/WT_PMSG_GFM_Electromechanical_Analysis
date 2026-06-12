@@ -90,3 +90,67 @@ Simulink 无法加载初始工作点，因为模型 'Grid_FormingVSG_PMSG' 在�
 这组结果说明：Type-a/Type-c 的结构差异仍然有研究意义，但当前非线性模型的不稳态问题不是 Type-c 前馈单独造成的。论文层面应将其表述为“机侧 DC 控制结构下的执行器电压裕度与电流方向一致性问题尚需校准”，不能直接把当前非线性 DC 漂移解释为机电耦合负阻尼现象。
 
 在无扰动基准稳定前，不应进入小扰动 FFT、SCR 扫描或 APCAD 非线性验证。
+
+## 7. q 轴电流环符号诊断
+
+为进一步判断 `Iq` 无法跟踪是否来自 q 轴电流环电压作用方向，新增了两个只用于诊断的编译期宏：
+
+```text
+MOTOR_IQ_PI_OUTPUT_SIGN
+MOTOR_IQ_FEEDBACK_SIGN
+```
+
+默认值均为 `+1`，不改变原模型行为。诊断时通过 `compile_vsg_sfunction` 临时传入 `MotorIqPiSign` 或 `MotorIqFeedbackSign`，仿真结束后已重新编译回默认 `+1/+1`。
+
+### 7.1 q 轴 PI 输出反号
+
+结果文件：
+
+```text
+Validation_Results/vsg_iq_pi_sign_diagnosis_20260612.csv
+```
+
+| `MotorIqPiSign` | `Udc` / V | `UdcSlope` / V/s | `Ppcc` / kW | `Iq_ref` / A | `Iq` / A | `Iq_ref-Iq` / A | `Iq PI` / V | `ModDepth` |
+|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| +1 | 1007.26 | -27.02 | 1027.14 | -264.92 | -1135.95 | 871.03 | +300 | 1.380 |
+| -1 | 4330.98 | -160.75 | 1045.76 | 1285.00 | -1387.04 | 2672.04 | -300 | 0.088 |
+
+结论：单独反转 q 轴 PI 输出并不能修复电流跟踪，反而导致 DC 电压严重抬升到约 4.3 kV。虽然调制深度变小，但这是因为 DC 电压异常升高，不是稳定运行点改善。
+
+### 7.2 q 轴电流反馈反号
+
+结果文件：
+
+```text
+Validation_Results/vsg_iq_feedback_sign_diagnosis_20260612.csv
+```
+
+| `MotorIqFeedbackSign` | `Udc` / V | `UdcSlope` / V/s | `Ppcc` / kW | `Iq_ref` / A | `Iq` / A | `Iq_ref-Iq` / A | `Iq PI` / V | `ModDepth` |
+|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| -1 | 5059.85 | -1581.75 | 1007.80 | 1067.94 | -1159.66 | 2227.61 | -300 | 0.075 |
+
+结论：单独反转 q 轴反馈也不能作为修复方案。它同样导致 DC 电压严重过高，并且 q 轴 PI 仍然贴限幅。
+
+## 8. 更新后的根因判断
+
+当前证据排除了两个过于简单的解释：
+
+1. 不是 Type-c 有功功率前馈单独导致；
+2. 不是单独把 q 轴 PI 输出或 q 轴反馈反号即可解决。
+
+更合理的判断是：当前机侧控制的符号和尺度需要作为一个整体重新校准，包括：
+
+- PMSG 发电机模式下 `Iq` 正负号与电磁转矩方向；
+- `Udc < VdcRef` 时，DC 外环输出应使机侧向 DC 电容补能还是减小发电功率；
+- 当前 `Iq_ref = iq_power_ff - PI(VdcRef-Udc)` 是否与上述能量方向一致；
+- q 轴电流环在限幅后的抗饱和是否能恢复；
+- `Uq_fwd` 与 Universal Bridge/SVPWM 的电压尺度是否一致。
+
+下一步建议不是继续扫增益，而是输出并核对控制器内部变量：
+
+```text
+pwm_speed_pi.Ref/Fdb/Error/Out
+iq_pi.Ref/Fdb/Error/Out
+```
+
+然后基于这些内部量重写一版“发电机侧 DC 电压控制符号表”，再决定是否修改 `Iq_ref` 生成公式或 q 轴电流环符号。

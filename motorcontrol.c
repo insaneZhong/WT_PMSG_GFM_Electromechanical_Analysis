@@ -90,14 +90,14 @@ void motor_control(MOTOR *p)
 	p->id_pi.Fdb          = p->bak.Id1;
 	p->id_pi.calc2(&p->id_pi);
 	p->iq_pi.Ref          = p->val.Iq_ref;
-	p->iq_pi.Fdb          = p->bak.Iq1;
+	p->iq_pi.Fdb          = MOTOR_IQ_FEEDBACK_SIGN * p->bak.Iq1;
 	p->iq_pi.calc2(&p->iq_pi);	
 
     p->val.Ud_fwd    = p->par.Rs * p->id_pi.Ref -  p->par.Polar*p->bak.We * p->par.Lq * p->iq_pi.Ref;
     p->val.Uq_fwd    = p->par.Rs * p->iq_pi.Ref +  p->par.Polar*p->bak.We *(p->par.Ld * p->id_pi.Ref + p->par.Fm);
 
     p->val.Ud1_ref = p->id_pi.Out+p->val.Ud_fwd;
-    p->val.Uq1_ref = p->iq_pi.Out+p->val.Uq_fwd;
+    p->val.Uq1_ref = MOTOR_IQ_PI_OUTPUT_SIGN * p->iq_pi.Out+p->val.Uq_fwd;
    /*************************************************************
 	*  电压 坐标变换 
  	**************************************************************/ 
