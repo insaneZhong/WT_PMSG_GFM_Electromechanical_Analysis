@@ -32,6 +32,7 @@ void motor_init(MOTOR *p)
 void motor_control(MOTOR *p)
 {	
     float iq_ref_target;
+    float iq_power_ff;
 
  	p->val.Id_ref  = 0;
     p->iq_slope_limit.Ts = p->Ts;
@@ -51,9 +52,18 @@ void motor_control(MOTOR *p)
         p->pwm_speed_pi.Fdb = p->bak.Udc1;
         motor_PI2_calc(&p->pwm_speed_pi);
 
-        /* Feedforward follows the staged GSC export command; PI corrects Udc. */
-        iq_ref_target = -MOTOR_IQ_POWER_FF_A_PER_W * p->ref.active_power_ref
-                        - p->pwm_speed_pi.Out;
+        /* MSC-DVC Type a/c switch:
+         * Type a uses only DC-voltage PI feedback.
+         * Type c adds active-power feedforward to the Type-a baseline.
+         */
+#if MOTOR_MSC_DVC_TYPE == MOTOR_MSC_DVC_TYPE_C
+        iq_power_ff = -MOTOR_IQ_POWER_FF_A_PER_W * p->ref.active_power_ref;
+#elif MOTOR_MSC_DVC_TYPE == MOTOR_MSC_DVC_TYPE_A
+        iq_power_ff = 0.0f;
+#else
+#error "Unsupported MOTOR_MSC_DVC_TYPE. Use MOTOR_MSC_DVC_TYPE_A or MOTOR_MSC_DVC_TYPE_C."
+#endif
+        iq_ref_target = iq_power_ff - p->pwm_speed_pi.Out;
         if (iq_ref_target > MOTOR_IQ_LIMIT_MAX) iq_ref_target = MOTOR_IQ_LIMIT_MAX;
         if (iq_ref_target < -MOTOR_IQ_LIMIT_MAX) iq_ref_target = -MOTOR_IQ_LIMIT_MAX;
         p->iq_slope_limit.In = iq_ref_target;

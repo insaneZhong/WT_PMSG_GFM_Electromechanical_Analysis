@@ -1,0 +1,11 @@
+File,Macro,Value
+motorcontrol.h,GRID_UDC__C,0.03
+motorcontrol.h,MOTOR_POLE_PAIR,20
+motorcontrol.h,MOTOR_RS,0.0122
+motorcontrol.h,MOTOR_LD,0.00102
+motorcontrol.h,MOTOR_LQ,0.00102
+motorcontrol.h,MOTOR_FM_25_TEMPERATURE,8.64
+motorcontrol.h,MOTOR_JM,183750
+motorcontrol.h,CURRENT_LOOP_BANDWITH_ID,220
+grid_forming_control_vsg.h,GRID_UDC__C,0.03
+grid_forming_control_vsg.h,CURRENT_LOOP_BANDWITH,220

@@ -34,6 +34,10 @@ assignin('base', 'wind_step_mps_override', wind_step_mps_override);
 assignin('base', 'sim_stop_time_override', sim_stop_time_override);
 
 mdl = 'Grid_Forming_PMSG';
+if ~isempty(fieldnames(ctrlOverrides)) && isfield(ctrlOverrides, 'ModelName') && ...
+        ~isempty(ctrlOverrides.ModelName)
+    mdl = char(ctrlOverrides.ModelName);
+end
 load_system(mdl);
 
 % Default behavior: skip repeated MEX compile in model InitFcn for faster
@@ -43,9 +47,23 @@ if ~isempty(fieldnames(ctrlOverrides)) && isfield(ctrlOverrides, 'SkipMexCompile
     skipMexCompile = logical(ctrlOverrides.SkipMexCompile);
 end
 
+% VSG-aligned model uses a dedicated S-Function (main_vsg) and source set.
+% Keep the legacy main.mexw64 untouched so the P-f PI baseline and the VSG
+% copy can be diagnosed independently.
+if strcmp(mdl, 'Grid_FormingVSG_PMSG') && exist(fullfile(root, ['main_vsg.' mexext]), 'file') ~= 3
+    compile_vsg_sfunction();
+end
+
 brkBlk = [mdl '/Three-Phase Breaker'];
 origBrkExternal = get_param(brkBlk, 'External');
 origBrkInit = get_param(brkBlk, 'InitialState');
+dcCapBlk = [mdl '/Cd'];
+hasDcCapBlk = getSimulinkBlockHandle(dcCapBlk) > 0;
+if hasDcCapBlk
+    origDcCapInitialVoltage = get_param(dcCapBlk, 'InitialVoltage');
+else
+    origDcCapInitialVoltage = '';
+end
 forceBreakerClosed = false;
 if isfield(ctrlOverrides, 'ForceBreakerClosed')
     forceBreakerClosed = logical(ctrlOverrides.ForceBreakerClosed);
@@ -54,6 +72,9 @@ if forceBreakerClosed
     % Optional: eliminate breaker timing uncertainty in diagnosis.
     set_param(brkBlk, 'External', 'off');
     set_param(brkBlk, 'InitialState', 'closed');
+end
+if ~isempty(fieldnames(ctrlOverrides)) && isfield(ctrlOverrides, 'DcInitialVoltage_V') && hasDcCapBlk
+    set_param(dcCapBlk, 'InitialVoltage', num2str(ctrlOverrides.DcInitialVoltage_V));
 end
 
 % Optional control-parameter overrides for S-Function mask.
@@ -70,6 +91,8 @@ origSaveFinalState = get_param(mdl, 'SaveFinalState');
 origFinalStateName = get_param(mdl, 'FinalStateName');
 origSaveOperatingPoint = get_param(mdl, 'SaveOperatingPoint');
 origSaveFormat = get_param(mdl, 'SaveFormat');
+origSimulationMode = get_param(mdl, 'SimulationMode');
+origFastRestart = get_param(mdl, 'FastRestart');
 
 prefSet = str2double(origPref);
 qrefSet = str2double(origQref);
@@ -130,7 +153,16 @@ if useInitialState
         initialStateStartTime = initialStateData.snapshotTime;
         sim_stop_time_override = initialStateStartTime + simStop;
         assignin('base', 'sim_stop_time_override', sim_stop_time_override);
+    elseif isstruct(initialStateData) && isfield(initialStateData, 'time') && ...
+            ~isempty(initialStateData.time)
+        initialStateStartTime = initialStateData.time(end);
+        sim_stop_time_override = initialStateStartTime + simStop;
+        assignin('base', 'sim_stop_time_override', sim_stop_time_override);
     end
+else
+    % The saved model may still point to a stale xInitial from prior runs.
+    % Force a true cold start unless an explicit initial state is supplied.
+    set_param(mdl, 'LoadInitialState', 'off', 'InitialState', '');
 end
 
 saveFinalState = false;
@@ -188,6 +220,13 @@ elseif useSchemeA
 end
 
 set_param(mdl, 'StopTime', num2str(sim_stop_time_override));
+if ~isempty(fieldnames(ctrlOverrides)) && isfield(ctrlOverrides, 'SimulationMode') && ...
+        ~isempty(ctrlOverrides.SimulationMode)
+    set_param(mdl, 'SimulationMode', char(ctrlOverrides.SimulationMode));
+end
+if ~isempty(fieldnames(ctrlOverrides)) && isfield(ctrlOverrides, 'UseFastRestart')
+    set_param(mdl, 'FastRestart', ternary(logical(ctrlOverrides.UseFastRestart), 'on', 'off'));
+end
 set_param(mdl, 'SimulationCommand', 'update');
 if useNumericSfunParams
     % Re-apply after update in case symbolic expression is restored.
@@ -195,8 +234,21 @@ if useNumericSfunParams
 end
 origReturnWorkspaceOutputs = get_param(mdl, 'ReturnWorkspaceOutputs');
 set_param(mdl, 'ReturnWorkspaceOutputs', 'on');
-simOut = sim(mdl);
+try
+    simOut = sim(mdl);
+catch ME
+    set_param(mdl, 'ReturnWorkspaceOutputs', origReturnWorkspaceOutputs);
+    set_param(mdl, 'SimulationMode', origSimulationMode);
+    set_param(mdl, 'FastRestart', origFastRestart);
+    set_param(mdl, 'InitFcn', initFcnBak);
+    if hasDcCapBlk
+        set_param(dcCapBlk, 'InitialVoltage', origDcCapInitialVoltage);
+    end
+    rethrow(ME);
+end
 set_param(mdl, 'ReturnWorkspaceOutputs', origReturnWorkspaceOutputs);
+set_param(mdl, 'SimulationMode', origSimulationMode);
+set_param(mdl, 'FastRestart', origFastRestart);
 set_param(mdl, 'InitFcn', initFcnBak);
 if saveFinalState || saveOperatingPoint || ~strcmp(saveFormat, origSaveFormat)
     set_param(mdl, 'LoadInitialState', origLoadInitialState, ...
@@ -209,6 +261,9 @@ end
 if forceBreakerClosed
     set_param(brkBlk, 'External', origBrkExternal);
     set_param(brkBlk, 'InitialState', origBrkInit);
+end
+if hasDcCapBlk
+    set_param(dcCapBlk, 'InitialVoltage', origDcCapInitialVoltage);
 end
 if ~isempty(fieldnames(ctrlOverrides))
     set_param(ctrlBlk, 'Pref', origPref);
@@ -249,9 +304,21 @@ missingSignals = strings(0, 1);
 [pref_out, missingSignals] = localGetSeries(simOut, 'pref_out', missingSignals);
 [pmeas_out, missingSignals] = localGetSeries(simOut, 'pmeas_out', missingSignals);
 [wref_out, missingSignals] = localGetSeries(simOut, 'wref_out', missingSignals);
-[presyn_out, missingSignals] = localGetSeries(simOut, 'presyn_out', missingSignals);
 [udc_meas, missingSignals] = localGetSeries(simOut, 'udc_meas', missingSignals);
+[ud1ref_out, missingSignals] = localGetSeries(simOut, 'ud1ref_out', missingSignals);
+optionalSignals = strings(0, 1);
+[presyn_out, optionalSignals] = localGetOptionalSeries(simOut, 'presyn_out', optionalSignals);
+[gsc_voltage_ref_out, optionalSignals] = localGetOptionalSeries(simOut, 'gsc_voltage_ref_out', optionalSignals);
+[gsc_uod_ref_out, optionalSignals] = localGetOptionalSeries(simOut, 'gsc_uod_ref_out', optionalSignals);
+[gsc_pcc_ud_out, optionalSignals] = localGetOptionalSeries(simOut, 'gsc_pcc_ud_out', optionalSignals);
 [msc_iqref, missingSignals] = localGetSeries(simOut, 'msc_iqref', missingSignals);
+[msc_ud_fwd, missingSignals] = localGetSeriesWithFallback(simOut, {'msc_ud_fwd', 'idref_out'}, missingSignals);
+[msc_uq_fwd, missingSignals] = localGetSeriesWithFallback(simOut, {'msc_uq_fwd', 'id_out'}, missingSignals);
+[msc_ud1ref, missingSignals] = localGetSeries(simOut, 'msc_ud1ref', missingSignals);
+[msc_uq1ref, missingSignals] = localGetSeries(simOut, 'msc_uq1ref', missingSignals);
+[msc_id, missingSignals] = localGetSeries(simOut, 'msc_id', missingSignals);
+[msc_iq, missingSignals] = localGetSeries(simOut, 'msc_iq', missingSignals);
+[msc_mod_depth_signal, optionalSignals] = localGetOptionalSeries(simOut, 'msc_mod_depth', optionalSignals);
 [pcc_ia, missingSignals] = localGetSeries(simOut, 'pcc_ia', missingSignals);
 [pcc_ib, missingSignals] = localGetSeries(simOut, 'pcc_ib', missingSignals);
 [pcc_ic, missingSignals] = localGetSeries(simOut, 'pcc_ic', missingSignals);
@@ -288,8 +355,34 @@ diag.udc_end_mean = localMean(udc_meas, tail);
 diag.udc_end_slope = localSlope(udc_meas, tail);
 diag.udc_end_min = localMin(udc_meas, tail);
 diag.udc_end_max = localMax(udc_meas, tail);
+diag.gsc_ud1ref_end_mean = localMean(ud1ref_out, tail);
+diag.gsc_ud1ref_end_maxabs = localMaxAbs(ud1ref_out, tail);
+diag.gsc_voltage_ref_end_mean = localMean(gsc_voltage_ref_out, tail);
+diag.gsc_uod_ref_end_mean = localMean(gsc_uod_ref_out, tail);
+diag.gsc_pcc_ud_end_mean = localMean(gsc_pcc_ud_out, tail);
+diag.gsc_pcc_ud_end_rms = localRms(gsc_pcc_ud_out, tail);
 diag.msc_iqref_end_mean = localMean(msc_iqref, tail);
 diag.msc_iqref_end_maxabs = localMaxAbs(msc_iqref, tail);
+diag.msc_ud_fwd_end_mean = localMean(msc_ud_fwd, tail);
+diag.msc_uq_fwd_end_mean = localMean(msc_uq_fwd, tail);
+diag.msc_ud1ref_end_mean = localMean(msc_ud1ref, tail);
+diag.msc_uq1ref_end_mean = localMean(msc_uq1ref, tail);
+diag.msc_id_end_mean = localMean(msc_id, tail);
+diag.msc_iq_end_mean = localMean(msc_iq, tail);
+msc_iq_tracking_error = localTimeseriesDifference(msc_iqref, msc_iq);
+msc_vcmd_mag = localTimeseriesMagnitude(msc_ud1ref, msc_uq1ref);
+msc_iq_pi_out = localTimeseriesDifference(msc_uq1ref, msc_uq_fwd);
+diag.msc_iq_tracking_error_end_mean = localMean(msc_iq_tracking_error, tail);
+diag.msc_iq_tracking_error_end_maxabs = localMaxAbs(msc_iq_tracking_error, tail);
+diag.msc_vcmd_mag_end_mean = localMean(msc_vcmd_mag, tail);
+diag.msc_vcmd_mag_end_max = localMax(msc_vcmd_mag, tail);
+diag.msc_linear_voltage_limit = diag.udc_end_mean / 1.5;
+diag.msc_mod_depth_mean = 1.5 * diag.msc_vcmd_mag_end_mean / diag.udc_end_mean;
+diag.msc_mod_depth_max = 1.5 * diag.msc_vcmd_mag_end_max / diag.udc_end_mean;
+diag.msc_mod_depth_signal_end_mean = localMean(msc_mod_depth_signal, tail);
+diag.msc_mod_depth_signal_end_max = localMax(msc_mod_depth_signal, tail);
+diag.msc_iq_pi_out_end_mean = localMean(msc_iq_pi_out, tail);
+diag.msc_iq_pi_out_end_maxabs = localMaxAbs(msc_iq_pi_out, tail);
 diag.pmeas_end_slope = localSlope(pmeas_out, tail);
 
 % PCC three-phase active power reconstruction from line-line voltages.
@@ -308,6 +401,7 @@ diag.three_phase_waveform_available_flag = all(isfinite([ ...
     diag.pcc_ia_end_rms, diag.pcc_ib_end_rms, diag.pcc_ic_end_rms, ...
     diag.pcc_uab_end_rms, diag.pcc_ubc_end_rms, diag.pcc_uca_end_rms]));
 diag.missing_signals = missingSignals;
+diag.missing_optional_signals = optionalSignals;
 diag.observation_complete_flag = isempty(missingSignals);
 diag.initial_state_loaded_flag = useInitialState;
 diag.initial_state_start_time = initialStateStartTime;
@@ -321,10 +415,24 @@ if saveSeries
     diag.series.theta_tw = localPackSeries(theta_tw, inf, seriesMaxPoints);
     diag.series.T_sh = localPackSeries(T_sh, inf, seriesMaxPoints);
     diag.series.T_e = localPackSeries(T_e, inf, seriesMaxPoints);
+    diag.series.T_aero = localPackSeries(T_aero, inf, seriesMaxPoints);
     diag.series.pmeas_out = localPackSeries(pmeas_out, inf, seriesMaxPoints);
-    diag.series.ppcc = localPackRaw(tp, ppcc, seriesMaxPoints);
-    diag.series.udc_meas = localPackSeries(udc_meas, inf, seriesMaxPoints);
-    diag.series.msc_iqref = localPackSeries(msc_iqref, inf, seriesMaxPoints);
+diag.series.ppcc = localPackRaw(tp, ppcc, seriesMaxPoints);
+diag.series.udc_meas = localPackSeries(udc_meas, inf, seriesMaxPoints);
+diag.series.ud1ref_out = localPackSeries(ud1ref_out, inf, seriesMaxPoints);
+diag.series.gsc_voltage_ref_out = localPackSeries(gsc_voltage_ref_out, inf, seriesMaxPoints);
+diag.series.gsc_uod_ref_out = localPackSeries(gsc_uod_ref_out, inf, seriesMaxPoints);
+diag.series.gsc_pcc_ud_out = localPackSeries(gsc_pcc_ud_out, inf, seriesMaxPoints);
+diag.series.msc_iqref = localPackSeries(msc_iqref, inf, seriesMaxPoints);
+    diag.series.msc_ud_fwd = localPackSeries(msc_ud_fwd, inf, seriesMaxPoints);
+    diag.series.msc_uq_fwd = localPackSeries(msc_uq_fwd, inf, seriesMaxPoints);
+    diag.series.msc_ud1ref = localPackSeries(msc_ud1ref, inf, seriesMaxPoints);
+    diag.series.msc_uq1ref = localPackSeries(msc_uq1ref, inf, seriesMaxPoints);
+    diag.series.msc_id = localPackSeries(msc_id, inf, seriesMaxPoints);
+    diag.series.msc_iq = localPackSeries(msc_iq, inf, seriesMaxPoints);
+    diag.series.msc_mod_depth_signal = localPackSeries(msc_mod_depth_signal, inf, seriesMaxPoints);
+    diag.series.msc_vcmd_mag = localPackSeries(msc_vcmd_mag, inf, seriesMaxPoints);
+    diag.series.msc_iq_pi_out = localPackSeries(msc_iq_pi_out, inf, seriesMaxPoints);
     diag.series.pcc_ia = localPackSeries(pcc_ia, threePhaseTail, seriesMaxPoints);
     diag.series.pcc_ib = localPackSeries(pcc_ib, threePhaseTail, seriesMaxPoints);
     diag.series.pcc_ic = localPackSeries(pcc_ic, threePhaseTail, seriesMaxPoints);
@@ -371,10 +479,14 @@ outDir = fullfile(root, 'Validation_Results');
 if ~exist(outDir, 'dir')
     mkdir(outDir);
 end
-save(fullfile(outDir, 'no_disturbance_diagnosis.mat'), 'diag');
+resultStem = 'no_disturbance_diagnosis';
+if ~strcmp(mdl, 'Grid_Forming_PMSG')
+    resultStem = ['no_disturbance_diagnosis_' mdl];
+end
+save(fullfile(outDir, [resultStem '.mat']), 'diag');
 
 % Short text report
-rep = fullfile(outDir, 'no_disturbance_diagnosis.md');
+rep = fullfile(outDir, [resultStem '.md']);
 fid = fopen(rep, 'w');
 fprintf(fid, '# 无扰动稳态诊断结果\n\n');
 fprintf(fid, '- 仿真时长: %.2f s\n', sim_stop_time_override);
@@ -393,6 +505,11 @@ fprintf(fid, '- P_pcc 相对1MW误差: %.6g pu\n', diag.Ppcc_target_error_pu);
 fprintf(fid, '- Udc 末端均值: %.6g V\n', diag.udc_end_mean);
 fprintf(fid, '- Udc 末端斜率: %.6g V/s\n', diag.udc_end_slope);
 fprintf(fid, '- Udc 末端范围: %.6g ~ %.6g V\n', diag.udc_end_min, diag.udc_end_max);
+fprintf(fid, '- GSC 电压参考/幅值参考/PCC d轴末端均值: %.6g / %.6g / %.6g V\n', ...
+    diag.gsc_voltage_ref_end_mean, diag.gsc_uod_ref_end_mean, diag.gsc_pcc_ud_end_mean);
+fprintf(fid, '- GSC d轴电压指令末端均值/最大绝对值: %.6g / %.6g V\n', diag.gsc_ud1ref_end_mean, diag.gsc_ud1ref_end_maxabs);
+fprintf(fid, '- MSC电压指令幅值末端均值/最大值: %.6g / %.6g V\n', diag.msc_vcmd_mag_end_mean, diag.msc_vcmd_mag_end_max);
+fprintf(fid, '- MSC q轴电流PI输出末端均值/最大绝对值: %.6g / %.6g V\n', diag.msc_iq_pi_out_end_mean, diag.msc_iq_pi_out_end_maxabs);
 fprintf(fid, '- PCC 三相电流 RMS: %.6g / %.6g / %.6g A\n', diag.pcc_ia_end_rms, diag.pcc_ib_end_rms, diag.pcc_ic_end_rms);
 fprintf(fid, '- PCC 三相线电压 RMS: %.6g / %.6g / %.6g V\n', diag.pcc_uab_end_rms, diag.pcc_ubc_end_rms, diag.pcc_uca_end_rms);
 fprintf(fid, '- PCC 三相波形可用判定: %d\n', diag.three_phase_waveform_available_flag);
@@ -402,6 +519,13 @@ fprintf(fid, '- DC稳态判定: %d\n\n', diag.dc_settled_flag);
 fprintf(fid, '- 基础模型有界运行判定: %d\n\n', diag.baseline_operational_flag);
 fprintf(fid, '## 主要原因提示\n');
 fprintf(fid, '- %s\n', diag.primary_cause_hint);
+fprintf(fid, '\n## MSC diagnostic quantities\n');
+fprintf(fid, '- Ud_fwd/Uq_fwd end mean: %.6g / %.6g V\n', diag.msc_ud_fwd_end_mean, diag.msc_uq_fwd_end_mean);
+fprintf(fid, '- Ud1_ref/Uq1_ref end mean: %.6g / %.6g V\n', diag.msc_ud1ref_end_mean, diag.msc_uq1ref_end_mean);
+fprintf(fid, '- Id/Iq end mean: %.6g / %.6g A\n', diag.msc_id_end_mean, diag.msc_iq_end_mean);
+fprintf(fid, '- Iq_ref minus Iq tracking error mean/maxabs: %.6g / %.6g A\n', diag.msc_iq_tracking_error_end_mean, diag.msc_iq_tracking_error_end_maxabs);
+fprintf(fid, '- Mod depth computed/signal mean: %.6g / %.6g\n', diag.msc_mod_depth_mean, diag.msc_mod_depth_signal_end_mean);
+fprintf(fid, '- Mod depth computed/signal max: %.6g / %.6g\n', diag.msc_mod_depth_max, diag.msc_mod_depth_signal_end_max);
 fclose(fid);
 
 disp(diag);
@@ -494,6 +618,74 @@ elseif evalin('base', sprintf('exist(''%s'', ''var'')', name))
 else
     ts = timeseries(zeros(0, 1), zeros(0, 1));
     missingSignals(end + 1, 1) = string(name);
+end
+if isstruct(ts) && isfield(ts, 'time') && isfield(ts, 'signals') && ...
+        isfield(ts.signals, 'values')
+    ts = timeseries(ts.signals.values, ts.time);
+end
+end
+
+function [ts, missingSignals] = localGetOptionalSeries(simOut, name, missingSignals)
+[ts, missingSignals] = localGetSeries(simOut, name, missingSignals);
+end
+
+function [ts, missingSignals] = localGetSeriesWithFallback(simOut, names, missingSignals)
+for k = 1:numel(names)
+    name = names{k};
+    if isa(simOut, 'Simulink.SimulationOutput') && any(strcmp(who(simOut), name))
+        ts = simOut.get(name);
+        ts = localNormalizeSeries(ts);
+        return;
+    elseif evalin('base', sprintf('exist(''%s'', ''var'')', name))
+        ts = evalin('base', name);
+        ts = localNormalizeSeries(ts);
+        return;
+    end
+end
+ts = timeseries(zeros(0, 1), zeros(0, 1));
+missingSignals(end + 1, 1) = string(strjoin(names, '|'));
+end
+
+function ts = localNormalizeSeries(ts)
+if isstruct(ts) && isfield(ts, 'time') && isfield(ts, 'signals') && ...
+        isfield(ts.signals, 'values')
+    ts = timeseries(ts.signals.values, ts.time);
+end
+end
+
+function mag = localTimeseriesMagnitude(x, y)
+if isempty(x) || isempty(y) || ~isprop(x, 'Time') || ~isprop(y, 'Time') || ...
+        isempty(x.Time) || isempty(y.Time)
+    mag = timeseries(zeros(0, 1), zeros(0, 1));
+    return;
+end
+t = x.Time(:);
+xv = x.Data(:);
+yv = localInterpLike(y, t);
+mag = timeseries(hypot(xv, yv), t);
+end
+
+function diffTs = localTimeseriesDifference(a, b)
+if isempty(a) || isempty(b) || ~isprop(a, 'Time') || ~isprop(b, 'Time') || ...
+        isempty(a.Time) || isempty(b.Time)
+    diffTs = timeseries(zeros(0, 1), zeros(0, 1));
+    return;
+end
+t = a.Time(:);
+av = a.Data(:);
+bv = localInterpLike(b, t);
+diffTs = timeseries(av - bv, t);
+end
+
+function y = localInterpLike(ts, t)
+tt = ts.Time(:);
+yy = ts.Data(:);
+if numel(tt) == numel(t) && max(abs(tt - t)) < 1e-12
+    y = yy;
+elseif numel(tt) >= 2
+    y = interp1(tt, yy, t, 'linear', 'extrap');
+else
+    y = NaN(size(t));
 end
 end
 
@@ -602,6 +794,9 @@ if isempty(ts) || ~isprop(ts, 'Time') || ~isprop(ts, 'Data')
 end
 t = ts.Time(:);
 y = ts.Data(:);
+if isempty(t) || isempty(y)
+    return;
+end
 idx = t >= max(t(end) - tail, t(1));
 if any(idx)
     val = sqrt(mean(y(idx).^2));
@@ -615,6 +810,9 @@ if isempty(ts) || ~isprop(ts, 'Time') || ~isprop(ts, 'Data')
 end
 t = ts.Time(:);
 y = ts.Data(:);
+if isempty(t) || isempty(y)
+    return;
+end
 idx = t >= max(t(end) - tail, t(1));
 if any(idx)
     val = min(y(idx));
@@ -628,6 +826,9 @@ if isempty(ts) || ~isprop(ts, 'Time') || ~isprop(ts, 'Data')
 end
 t = ts.Time(:);
 y = ts.Data(:);
+if isempty(t) || isempty(y)
+    return;
+end
 idx = t >= max(t(end) - tail, t(1));
 if any(idx)
     val = max(y(idx));

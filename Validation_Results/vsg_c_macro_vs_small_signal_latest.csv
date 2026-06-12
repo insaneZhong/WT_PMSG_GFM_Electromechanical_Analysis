@@ -1,0 +1,8 @@
+Macro,SmallSignalName,Description,MacroValue,SmallSignalValue,Delta,RelativePercent,Status
+GRID_UDC__C,C_dc,DC-link capacitance,0.03,0.0015,0.0285,1900,mismatch
+MOTOR_POLE_PAIR,n_p,PMSG pole pairs,20,20,0,0,match
+MOTOR_RS,R_s,PMSG stator resistance,0.0122,0.0122,0,0,match
+MOTOR_LD,L_d,PMSG d-axis inductance,0.00102,0.00105,-2.99999999999999e-05,-2.85714285714284,mismatch
+MOTOR_LQ,L_q,PMSG q-axis inductance,0.00102,0.00105,-2.99999999999999e-05,-2.85714285714284,mismatch
+MOTOR_FM_25_TEMPERATURE,psi_f,PMSG PM flux linkage,8.64,8.64,0,0,match
+MOTOR_JM,J_g,PMSG generator inertia,183750,183750,0,0,match

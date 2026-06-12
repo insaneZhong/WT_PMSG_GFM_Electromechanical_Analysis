@@ -2,53 +2,104 @@
 #define   __MOTOR_CONT__
 
 #define   MOTOR_RS                       0.0122      
-#define   MOTOR_LD                       0.00102     
-#define   MOTOR_LQ                       0.00102     
+#ifndef MOTOR_LD
+#define   MOTOR_LD                       0.00102
+#endif
+#ifndef MOTOR_LQ
+#define   MOTOR_LQ                       0.00102
+#endif
 #define   MOTOR_FM_25_TEMPERATURE        8.64
 #define   MOTOR_POLE_PAIR                20          
 #define   MOTOR_JM                       183750  
 #define   MOTOR_BW                       0.001
 #define   System_frequcncy               0.00025
 
+#ifndef GRID_UDC__C
 #define   GRID_UDC__C                           0.03
+#endif
 
 #define   MOTOR_ID_LIMIT_MAX                         1500     
 #define   MOTOR_IQ_LIMIT_MAX                         1500      
 #define   MOTOR_SPEED_PROTECT                        100     
 
 #define   MOTOR_ID_REF_SLOPE_LIMIT_MAX               1000      
-#define   MOTOR_IQ_REF_SLOPE_LIMIT_MAX               1000       
+#ifndef MOTOR_IQ_REF_SLOPE_LIMIT_MAX
+#define   MOTOR_IQ_REF_SLOPE_LIMIT_MAX               1000
+#endif
 #define   MOTOR_CLOSE_SPEED_REF_SLOPE_LIMIT_MAX      100      
 
+#ifndef CURRENT_LOOP_BANDWITH_ID
 #define   CURRENT_LOOP_BANDWITH_ID             220    // mapped from small-signal model (scheme A)
+#endif
+#ifndef MOTOR_ID_KP
 #define   MOTOR_ID_KP                          1.4
+#endif
+#ifndef MOTOR_ID_KI
 #define   MOTOR_ID_KI                          0.00290476
-#define   MOTOR_ID_KC                          0.0001   
+#endif
+#ifndef MOTOR_ID_KC
+#define   MOTOR_ID_KC                          0.0001
+#endif
+#ifndef MOTOR_ID_KD
 #define   MOTOR_ID_KD                          0.000001
-#define   MOTOR_PI_ID_OUT_MAX                  700     
-#define   MOTOR_PI_ID_OUT_MIN                 -700     
+#endif
+#ifndef MOTOR_PI_ID_OUT_MAX
+#define   MOTOR_PI_ID_OUT_MAX                  700
+#endif
+#ifndef MOTOR_PI_ID_OUT_MIN
+#define   MOTOR_PI_ID_OUT_MIN                 -700
+#endif
 
+#ifndef MOTOR_IQ_KP
 #define   MOTOR_IQ_KP                          1.4
+#endif
+#ifndef MOTOR_IQ_KI
 #define   MOTOR_IQ_KI                          0.00290476
-#define   MOTOR_IQ_KC                          0.0001 
+#endif
+#ifndef MOTOR_IQ_KC
+#define   MOTOR_IQ_KC                          0.0001
+#endif
+#ifndef MOTOR_IQ_KD
 #define   MOTOR_IQ_KD                          0.000001
+#endif
+#ifndef MOTOR_PI_IQ_OUT_MAX
 #define   MOTOR_PI_IQ_OUT_MAX                  700
+#endif
+#ifndef MOTOR_PI_IQ_OUT_MIN
 #define   MOTOR_PI_IQ_OUT_MIN                 -700
+#endif
 
 #define   SPEED_LOOP_BANDWITH                  12   //Hz, reduced for no-disturbance steady-state convergence
-#define   MOTOR_PWM_SPEED_KP                  0.10  
-#define   MOTOR_PWM_SPEED_KI                  0.0007
+#ifndef MOTOR_PWM_SPEED_KP
+#define   MOTOR_PWM_SPEED_KP                  0.050
+#endif
+#ifndef MOTOR_PWM_SPEED_KI
+#define   MOTOR_PWM_SPEED_KI                  0.00035
+#endif
+#ifndef MOTOR_PWM_SPEED_KC
 #define	  MOTOR_PWM_SPEED_KC                   0.00001
+#endif
 #define	  MOTOR_PWM_SPEED_KD                   0.000001
 #define   MOTOR_PWM_SPEED_PI_OUT_MAX           MOTOR_IQ_LIMIT_MAX    //输出为电流,
 #define   MOTOR_PWM_SPEED_PI_OUT_MIN          -MOTOR_IQ_LIMIT_MAX    //输出为电流,
-/* MSC-DVC startup coordination:
- * convert the staged GSC active-power command into a generator q-axis
- * current feedforward. The direct DC-voltage PI remains the correction path. */
-#define   MOTOR_IQ_POWER_FF_A_PER_W           0.0002
+/* MSC-DVC structure selector.
+ * Type a: DC-voltage feedback only, Iq_ref = -PI(Udc_ref - Udc).
+ * Type c: Type a plus active-power feedforward,
+ *         Iq_ref = -Kff*Pref - PI(Udc_ref - Udc).
+ */
+#define   MOTOR_MSC_DVC_TYPE_A                 1
+#define   MOTOR_MSC_DVC_TYPE_C                 3
+#ifndef MOTOR_MSC_DVC_TYPE
+#define   MOTOR_MSC_DVC_TYPE                   MOTOR_MSC_DVC_TYPE_C
+#endif
+
+/* Type-c feedforward gain. It is ignored when MOTOR_MSC_DVC_TYPE is Type a. */
+#ifndef MOTOR_IQ_POWER_FF_A_PER_W
+#define   MOTOR_IQ_POWER_FF_A_PER_W           0.000225
+#endif
 
 
-#define   V_LOOP_BANDWITH                     5   // Hz, MSC DC-link loop
+#define   V_LOOP_BANDWITH                     12   // Hz, MSC DC-link loop
 #define	  V_LOOP_KP                   GRID_UDC__C * V_LOOP_BANDWITH * 2 *3.1415926
 #define   V_LOOP_KI                    V_LOOP_KP/ 0.01 *0.00025
 
