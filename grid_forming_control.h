@@ -1,43 +1,112 @@
 ﻿#ifndef   __GRID_SIDE_RECTIFY_CONTROL__
 #define   __GRID_SIDE_RECTIFY_CONTROL__
 #define   SQRT3     1.732
-#define   GRID_FILTER__LS                       0.00012       //   0.12mH
-#define   GRID_FILTER__C                        0.000055     //  55uF
-#define   GRID_LINE_impedance__L                0.0005    //0.5mH
+#ifndef GRID_FILTER__LS
+#define   GRID_FILTER__LS                       0.00012       // 0.12mH
+#endif
+#ifndef GRID_FILTER__C
+#define   GRID_FILTER__C                        0.000055      // 55uF
+#endif
+#ifndef GRID_LINE_impedance__L
+#define   GRID_LINE_impedance__L                0.0005        // 0.5mH
+#endif
+#ifndef GRID__RS
 #define   GRID__RS                              0.0002
-#define   GRID_UDC__C                           0.03      
+#endif
+#ifndef GRID_UDC__C
+#define   GRID_UDC__C                           0.03
+#endif
 #ifndef PRESYN_SWITCH_TIME
-#define   PRESYN_SWITCH_TIME                    0.5
+#define   PRESYN_SWITCH_TIME                    1.75
 #endif
 /* Optional: enable VSG-equivalent frequency state update for strict
  * small-signal/nonlinear structure alignment.
  * 0: keep legacy P-loop -> w_ref PI implementation
  * 1: use 2H*w0*dw/dt = P_ref - P - (w-w0)/mp
  */
+#ifndef ENABLE_VSG_EQUIV_WREF
 #define   ENABLE_VSG_EQUIV_WREF                0
+#endif
+#ifndef VSG_EQUIV_W0
 #define   VSG_EQUIV_W0                         314.0
+#endif
+#ifndef GSI_NOMINAL_OMEGA_RADPS
+#define   GSI_NOMINAL_OMEGA_RADPS              VSG_EQUIV_W0
+#endif
+#ifndef GSI_NOMINAL_VOLTAGE_PHASE_PEAK_V
+#define   GSI_NOMINAL_VOLTAGE_PHASE_PEAK_V     563.0
+#endif
+#ifndef GSI_E_VOLTAGE_MAX_V
+#define   GSI_E_VOLTAGE_MAX_V                  800.0
+#endif
+#ifndef VSG_EQUIV_H
 #define   VSG_EQUIV_H                          10.0
+#endif
+#ifndef VSG_EQUIV_MP
 #define   VSG_EQUIV_MP                         1.57e-6
+#endif
  
 #define   V_REF_SLOPE_LIMIT_MAX                  1200      
 #define   MOTOR_2PI_RADIAN  		             6.2831853    //弧度  360°
 #define   PWM_2PI3_RADIAN                        2.0943950    //弧度 2pi/3
 
 #define   CURRENT_LOOP_BANDWITH                  220   //Hz, mapped from small-signal model (scheme A)  //电流环的带宽一般是系统控制频率的0.1-0.2倍fs之间
+#ifndef CURRENT_ID_KP
 #define   CURRENT_ID_KP                          0.16
+#endif
+#ifndef CURRENT_ID_KI
 #define   CURRENT_ID_KI                          0.0172917
+#endif
 #define   CURRENT_ID_KC                          0   
 #define   CURRENT_ID_KD                          0
-#define   CURRENT_PI_ID_OUT_MAX                  700     
-#define   CURRENT_PI_ID_OUT_MIN                 -700     
+#ifndef CURRENT_PI_ID_OUT_MAX
+#define   CURRENT_PI_ID_OUT_MAX                  700
+#endif
+#ifndef CURRENT_PI_ID_OUT_MIN
+#define   CURRENT_PI_ID_OUT_MIN                 -700
+#endif
 
+#ifndef CURRENT_IQ_KP
 #define   CURRENT_IQ_KP                          CURRENT_ID_KP
+#endif
+#ifndef CURRENT_IQ_KI
 #define   CURRENT_IQ_KI                          CURRENT_ID_KI
+#endif
 #define   CURRENT_IQ_KC                          0 
 #define   CURRENT_IQ_KD                          0
+#ifndef CURRENT_PI_IQ_OUT_MAX
 #define   CURRENT_PI_IQ_OUT_MAX                  700
+#endif
+#ifndef CURRENT_PI_IQ_OUT_MIN
 #define   CURRENT_PI_IQ_OUT_MIN                 -700
-#define    CURRENT_LIMIT_MAX           1500
+#endif
+#ifndef CURRENT_LIMIT_MAX
+#define   CURRENT_LIMIT_MAX                      1500
+#endif
+#ifndef GSI_CURRENT_VECTOR_LIMIT_A
+#define   GSI_CURRENT_VECTOR_LIMIT_A   0.0
+#endif
+#ifndef GSI_VOLTAGE_MODULATION_LIMIT
+#define   GSI_VOLTAGE_MODULATION_LIMIT 0.0
+#endif
+#ifndef GSI_NORMAL_LIMITS_ENABLE
+#define   GSI_NORMAL_LIMITS_ENABLE     0
+#endif
+#ifndef GSI_GFM_ENABLE_TIME_S
+#define   GSI_GFM_ENABLE_TIME_S        PRESYN_SWITCH_TIME
+#endif
+#ifndef GSI_QV_DROOP_V_PER_VAR
+#define   GSI_QV_DROOP_V_PER_VAR       (3.45f/100000.0f)
+#endif
+#ifndef VSG_POWER_ERROR_SIGN
+#define   VSG_POWER_ERROR_SIGN          1.0f
+#endif
+#ifndef MSC_LVRT_UDC_THRESHOLD_V
+#define   MSC_LVRT_UDC_THRESHOLD_V     1.0e9
+#endif
+#ifndef MSC_LVRT_ENABLE_TIME_S
+#define   MSC_LVRT_ENABLE_TIME_S       0.0
+#endif
 #define   GSI_V_LOOP_BANDWITH         CURRENT_LOOP_BANDWITH/10   //Hz
 /* Preserve the legacy effective voltage-loop gains while keeping the
  * grid-side loop independent from the machine-side DC loop symbols. */
@@ -62,7 +131,7 @@
 #define   GSI_PLOOP_KI                        2e-5
 #endif
 #ifndef GSI_PREF_RAMP_SLOPE
-#define   GSI_PREF_RAMP_SLOPE                 2000000
+#define   GSI_PREF_RAMP_SLOPE                 1000000
 #endif
 #ifndef GSI_PF_LOOP_SIGN
 /* For inverter power export: Pref-Pmeas > 0 should advance the internal
