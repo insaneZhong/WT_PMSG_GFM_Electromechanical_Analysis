@@ -45,6 +45,18 @@
 #ifndef VSG_EQUIV_MP
 #define   VSG_EQUIV_MP                         1.57e-6
 #endif
+#ifndef VSG_EQUIV_SBASE_W
+#define   VSG_EQUIV_SBASE_W                    1.0e6
+#endif
+#ifndef VSG_STARTUP_MP
+#define   VSG_STARTUP_MP                       VSG_EQUIV_MP
+#endif
+#ifndef VSG_DYNAMICS_TRANSITION_START_S
+#define   VSG_DYNAMICS_TRANSITION_START_S      0.0f
+#endif
+#ifndef VSG_DYNAMICS_TRANSITION_DURATION_S
+#define   VSG_DYNAMICS_TRANSITION_DURATION_S   0.0f
+#endif
  
 #define   V_REF_SLOPE_LIMIT_MAX                  1200      
 #define   MOTOR_2PI_RADIAN  		             6.2831853    //弧度  360°
@@ -100,6 +112,9 @@
 #endif
 #ifndef VSG_POWER_ERROR_SIGN
 #define   VSG_POWER_ERROR_SIGN          1.0f
+#endif
+#ifndef VSG_STARTUP_POWER_ERROR_SIGN
+#define   VSG_STARTUP_POWER_ERROR_SIGN  VSG_POWER_ERROR_SIGN
 #endif
 #ifndef MSC_LVRT_UDC_THRESHOLD_V
 #define   MSC_LVRT_UDC_THRESHOLD_V     1.0e9

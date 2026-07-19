@@ -30,6 +30,11 @@ VdcRef_V = p5.Vdc;
 VacRef_V = p5.V_control_d;
 Pref_W = p5.P_wt_rated;
 Qref_var = 0;
+if exist('qref_var_override','var')
+    Qref_var = qref_var_override;
+elseif evalin('base','exist(''qref_var_override'',''var'')')
+    Qref_var = evalin('base','qref_var_override');
+end
 C_dc = p5.Cdc;
 Cdc = p5.Cdc;
 V_dc0 = p5.Vdc;
@@ -47,8 +52,18 @@ i_m_q0 = p5.i_m_q0;
 GridFilterL = p5.Lf;
 GridFilterR = p5.Rf;
 GridFilterC = p5.Cf;
-GridLineL = p5.Lg;
-GridRs = p5.Rg;
+SCR_runtime = p5.SCR;
+if exist('scr_override','var')
+    SCR_runtime = scr_override;
+elseif evalin('base','exist(''scr_override'',''var'')')
+    SCR_runtime = evalin('base','scr_override');
+end
+assert(isnumeric(SCR_runtime) && isscalar(SCR_runtime) && ...
+    isfinite(SCR_runtime) && SCR_runtime > 0, ...
+    'SCR override must be a positive finite scalar.');
+grid_impedance_scale = p5.SCR/SCR_runtime;
+GridLineL = p5.Lg*grid_impedance_scale;
+GridRs = p5.Rg*grid_impedance_scale;
 CurrentLimit = p5.grid_current_limit;
 MotorCurrentLimit = p5.motor_current_limit;
 MotorVoltLimit = p5.motor_voltage_limit;
@@ -97,6 +112,8 @@ sim_stop_time = 6;
 param_sync_info_5mw = p5;
 param_sync_info_5mw.D_sh_runtime = D_sh;
 param_sync_info_5mw.shaft_damping_scale = shaft_damping_scale;
+param_sync_info_5mw.SCR_runtime = SCR_runtime;
+param_sync_info_5mw.grid_impedance_scale = grid_impedance_scale;
 
 names5 = { ...
     'P_wt_rated','omega_m0','v_w0','J_t','J_g','K_sh','D_sh','D_t','D_g', ...
@@ -104,6 +121,7 @@ names5 = { ...
     'Vdc','VdcRef_V','VacRef_V','Pref_W','Qref_var','C_dc','Cdc','V_dc0', ...
     'S_base','V_LL','f_base','R_s','L_d','L_q','psi_f','n_p','i_m_d0','i_m_q0', ...
     'GridFilterL','GridFilterR','GridFilterC','GridLineL','GridRs','CurrentLimit', ...
+    'SCR_runtime','grid_impedance_scale', ...
     'MotorCurrentLimit','MotorVoltLimit','VSG_H','VSG_MP','k_pdc','k_idc', ...
     'k_ff_msc_typec','DvcType','rated_wind_speed','rotor_radius', ...
     'air_density','rotor_area','K_opt','K_rated_recovery', ...

@@ -241,13 +241,40 @@ void grid_side_control(GRID_SIDE_INV *p)
 
 #if ENABLE_VSG_EQUIV_WREF
           {
-              float p_err = VSG_POWER_ERROR_SIGN *
-                  (vloop_slope.Out -
-                   p->val.pcc_P_active_Power_filter);
-              float dw = (p_err -
-                  (w_vsg_state - w_vsg_sync_anchor)/VSG_EQUIV_MP) /
+              float p_err = vloop_slope.Out -
+                  p->val.pcc_P_active_Power_filter;
+              float transition_alpha;
+              float delta_w = w_vsg_state - w_vsg_sync_anchor;
+              float dw_startup = (VSG_STARTUP_POWER_ERROR_SIGN*p_err -
+                  delta_w/VSG_STARTUP_MP) /
                   (2.0f*VSG_EQUIV_H*VSG_EQUIV_W0);
+              /* SI operating swing equation:
+               *   dw/dt = w0/(2*H*Sbase) * (DeltaP-DeltaW/mp)
+               * Preserve the validated commissioning dynamics only during
+               * cold start, then blend to the physical operating equation. */
+              float dw_operating = (VSG_POWER_ERROR_SIGN*p_err -
+                  delta_w/VSG_EQUIV_MP) *
+                  VSG_EQUIV_W0 /
+                  (2.0f*VSG_EQUIV_H*VSG_EQUIV_SBASE_W);
+              if (VSG_DYNAMICS_TRANSITION_DURATION_S <= 0.0f)
+              {
+                  transition_alpha = 1.0f;
+              }
+              else
+              {
+                  transition_alpha = (system_Time -
+                      VSG_DYNAMICS_TRANSITION_START_S) /
+                      VSG_DYNAMICS_TRANSITION_DURATION_S;
+                  if (transition_alpha < 0.0f) transition_alpha = 0.0f;
+                  if (transition_alpha > 1.0f) transition_alpha = 1.0f;
+              }
+              float dw = (1.0f-transition_alpha)*dw_startup +
+                  transition_alpha*dw_operating;
               w_vsg_state += p->Ts * dw;
+              /* Keep the validated PWM/Park angle coordinate continuous.
+               * Its measured incremental P-angle orientation is negative,
+               * therefore the operating swing equation uses P-Pref through
+               * VSG_POWER_ERROR_SIGN=-1 instead of mirroring frequency. */
               p->pf.w_ref = w_vsg_state;
           }
 #else

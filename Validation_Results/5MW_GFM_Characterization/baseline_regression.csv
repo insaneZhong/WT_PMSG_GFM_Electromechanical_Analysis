@@ -1,0 +1,24 @@
+metric,value,unit,criterion,limit,pass
+Ppcc_mean,5006230.3012,W,absolute error from 5 MW,50000,1
+Udc_mean,1499.01275286773,V,absolute error from 1500 V,30,1
+Ppcc_slope,-30.8551176481029,W/s,absolute value,5000,1
+Udc_slope,0.0332501019215101,V/s,absolute value,5,1
+omega_g_mean,1.32295946709397,rad/s,record,NaN,NaN
+omega_t_mean,1.32296693481773,rad/s,record,NaN,NaN
+omega_g_slope,-0.00171062445635948,rad/s^2,absolute value,0.01,1
+omega_t_slope,-0.00171005668239631,rad/s^2,absolute value,0.01,1
+theta_slope,8.26117332299818e-06,rad/s,absolute value,0.0005,1
+torque_residual,0.00189706328372613,pu,absolute value,0.01,1
+gsc_modulation_max,0.552618632791705,pu,less than,0.9,1
+msc_modulation_max,0.545928765283133,pu,less than,0.9,1
+gsc_current_ref_max,7316.92371177391,A,less than or equal,8695.65217391304,1
+gsc_current_max,7391.5563556476,A,less than or equal,8695.65217391304,1
+msc_iq_ref_max,16771.677734375,A,less than or equal,18226.8883056285,1
+msc_iq_max,16752.03515625,A,less than or equal,18226.8883056285,1
+gsc_tracking_error_rms,101.452593650478,A,record,NaN,NaN
+gsc_tracking_error_max,202.622932983921,A,record,NaN,NaN
+msc_tracking_error_rms,36.2244575807109,A,record,NaN,NaN
+msc_tracking_error_max,90.330078125,A,record,NaN,NaN
+gsc_modulation_limit_duty,0,fraction,equal zero,0,1
+gsc_current_ref_limit_duty,0,fraction,equal zero,0,1
+msc_current_ref_limit_duty,0,fraction,equal zero,0,1

@@ -114,11 +114,21 @@ p.D_t = 0.005*p.D_aero;
 p.D_g = 0.005*p.D_aero;
 
 p.VSG_H_paper = 3;
-% Retained as plant metadata only.  The runnable 5 MW model preserves the
-% 1 MW blueprint's legacy P-f PI path and does not enable the VSG branch.
+% The runnable controller enables the VSG swing-equation branch through
+% ENABLE_VSG_EQUIV_WREF=1.  PLL is used only before the timed GFM takeover.
 p.VSG_H = p.VSG_H_paper;
 p.VSG_Kp_literature = 0.0104;
-p.mp = 0.2 * 2*pi*(0.01*p.f_base)/(2*p.S_base);
+% Normal power tracking confirms the implemented swing equation must use
+% Pref-Ppcc.  Start the operating-point characterization from a 0.1 percent
+% P-f droop stability anchor, then increase it only after the physical SI
+% swing equation passes the no-disturbance regression.
+p.vsg_startup_power_error_sign = 1;
+p.vsg_power_error_sign = 1;
+p.pf_droop_fraction = 0.001;
+p.mp = 2*pi*(p.pf_droop_fraction*p.f_base)/p.S_base;
+p.vsg_startup_mp = 0.2 * 2*pi*(0.01*p.f_base)/(2*p.S_base);
+p.vsg_dynamics_transition_start_s = 15.0;
+p.vsg_dynamics_transition_duration_s = 5.0;
 p.k_pq = 0.001;
 p.qv_droop_V_per_var = p.k_pq*p.V_control_d/p.S_base;
 p.k_pdc_pu = 0.78;
