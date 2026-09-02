@@ -1,2 +1,8 @@
 .DS_Store
 ~$*.docx
+
+# OpenFAST/M3 local binaries, builds, and raw results remain outside Git.
+OpenFAST_S6_Tooling/temp/
+OpenFAST_S6_Tooling/build/
+OpenFAST_S6_Tooling/*.mexw64
+OpenFAST_S6_Tooling/*.dll
