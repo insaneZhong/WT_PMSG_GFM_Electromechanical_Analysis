@@ -710,6 +710,16 @@ for closure=[0 1]
 end
 end
 
+function v=localS6TableValue(T,name,default)
+%LOCAL S6 TABLE VALUE 读取单行摘要字段；缺失时返回明确的NaN/默认值。
+if isempty(T)||~ismember(name,T.Properties.VariableNames)
+    v=default;return;
+end
+x=T{1,name};
+if iscell(x),x=x{1};end
+if isempty(x),v=default;else,v=x;end
+end
+
 function q=periodicFloquetMetrics(phaseModels,phaseDt)
 % Piecewise-constant, one-revolution Floquet audit of matrices already
 % transformed to the fixed MBC frame by the official toolbox.  This is an
@@ -757,6 +767,11 @@ fid=fopen(path,'w','n','UTF-8');assert(fid>0,'Cannot open S6 report.');c=onClean
 MI=S6.low_frequency_mechanical_impedance_audit;
 MIshow=MI(MI.Architecture=="MWT",:);
 IA=S6.simulink_nonlinear_interface_audit;
+LF=S6.low_frequency_interconnection_audit;
+lf1=LF(abs(LF.Frequency_Hz-1e-3)<1e-12 & LF.Closure=="TORQUE_FEEDBACK_FULL",:);
+getlf=@(arch,name,default) localS6TableValue(lf1(lf1.Architecture==arch,:),name,default);
+mwte=getlf("MWT","ElectricalGainReal",NaN);mwtm=getlf("MWT","MechanicalGainReal",NaN);mwtloop=getlf("MWT","LoopGainReal",NaN);mwtphase=getlf("MWT","LoopPhase_deg",NaN);
+gfle=getlf("GFL","ElectricalGainReal",NaN);gwtE=getlf("GWT","ElectricalGainReal",NaN);gflLoop=getlf("GFL","LoopGainReal",NaN);gwtLoop=getlf("GWT","LoopGainReal",NaN);
 fprintf(fid,'# M3 S6：OpenFAST柔性机械局部反例测试\n\n## 研究边界\n\n本轮使用OpenFAST官方 `5MW_Land_Linear_Aero_CalcSteady` 三方位角周期稳态线性化，经官方MBC工具变换。它是NREL 5 MW**有齿轮箱**参考机组；与当前直驱PMSG只通过低速轴等效转矩—转速功率守恒接口连接，因此属于跨模型局部反例测试，不是新的主基准。\n\n**互连边界：S6只将OpenFAST的线性化柔性机械矩阵与M3电气小信号状态空间矩阵拼接；没有调用Simulink理想非线性模型，未进行OpenFAST—Simulink时域联合仿真，也未将其计入非线性联合验证。**\n\n- S6变体：`%s`；r-test commit：`%s`；\n- 风速 %.6g m/s，转速 %.6g rad/s，GBRatio %.6g；\n- OpenFAST `DOF_GeAz`状态速度 %.6g rad/s，与低速转子速度的比值 %.9g（低速等效坐标审计：`%s`）；\n- HSS转矩 %.6g N m，低速轴等效转矩 %.6g N m，等效功率 %.6g MW；\n- 正OpenFAST发电机转矩对发电机加速度偏导：%.6g (rad/s^2)/(N m)，与M3正发电制动转矩定义一致：`%s`。\n\n',S6.variant,gate.r_test_commit,gate.openfast_wind_mps,gate.openfast_rotor_speed_radps,gate.gear_ratio,gate.openfast_geaz_speed_radps,gate.openfast_speed_coordinate_ratio_to_rotor,iff(gate.openfast_speed_coordinate_is_lss_equivalent,'YES','NO'),gate.openfast_hss_torque_Nm,gate.openfast_lss_equivalent_torque_Nm,gate.openfast_equivalent_power_W/1e6,gate.openfast_generator_speed_accel_per_positive_torque,iff(gate.generator_torque_sign_consistent,'YES','NO'));
 fprintf(fid,'# M3 S6：OpenFAST柔性机械局部反例测试\n\n## 研究边界\n\n本轮使用OpenFAST官方 `5MW_Land_Linear_Aero_CalcSteady` 三方位角周期稳态线性化，经官方MBC工具变换。它是NREL 5 MW**有齿轮箱**参考机组；与当前直驱PMSG只通过低速轴等效转矩—转速功率守恒接口连接，因此属于跨模型局部反例测试，不是新的主基准。\n\n**互连边界：S6只将OpenFAST的线性化柔性机械矩阵与M3电气小信号状态空间矩阵拼接；没有调用Simulink理想非线性模型，未进行OpenFAST—Simulink时域联合仿真，也未将其计入非线性联合验证。**\n\n- S6变体：`%s`；r-test commit：`%s`；\n- 风速 %.6g m/s，转速 %.6g rad/s，GBRatio %.6g；\n- OpenFAST `DOF_GeAz`状态速度 %.6g rad/s，与低速转子速度的比值 %.9g（低速等效坐标审计：`%s`）；\n- HSS转矩 %.6g N m，低速轴等效转矩 %.6g N m，等效功率 %.6g MW；\n- 正OpenFAST发电机转矩对发电机加速度偏导：%.6g (rad/s^2)/(N m)，与M3正发电制动转矩定义一致：`%s`。\n\n## 非线性联合仿真接口资产审计\n\n当前S6目录内：`FAST_SFunc` MEX数量=%d，`FAST_Library`数量=%d，`create_FAST_SFunc.m`数量=%d；直接Simulink联仿接口可用：`%s`。本项只审计已存在资产，未下载源码、未编译MEX，也不改变S6 Gate。\n\n',S6.variant,gate.r_test_commit,gate.openfast_wind_mps,gate.openfast_rotor_speed_radps,gate.gear_ratio,gate.openfast_geaz_speed_radps,gate.openfast_speed_coordinate_ratio_to_rotor,iff(gate.openfast_speed_coordinate_is_lss_equivalent,'YES','NO'),gate.openfast_hss_torque_Nm,gate.openfast_lss_equivalent_torque_Nm,gate.openfast_equivalent_power_W/1e6,gate.openfast_generator_speed_accel_per_positive_torque,iff(gate.generator_torque_sign_consistent,'YES','NO'),IA.sfunc_mex_count,IA.fast_library_count,IA.build_script_count,iff(IA.current_assets_support_direct_simulink_cosim,'YES','NO'));
 if gate.frozen_wake_direct
@@ -775,6 +790,10 @@ fprintf(fid,'\n此表把同一低速轴正发电制动转矩到低速等效发�
 fprintf(fid,'\n## 低频电—机互连频响与 Schur 审计\n\n');
 writeM3Table(fid,S6.low_frequency_interconnection_audit);
 fprintf(fid,'\n本表在 1 mHz–2.5 Hz 仅保存紧凑频域量：`ElectricalGain` 为 `Delta T_e/Delta omega_g`，`MechanicalGain` 为 `Delta omega_g/Delta T_e`，`LoopGain` 为两者乘积。`TORQUE_FEEDBACK_OPEN` 切断电气状态到机械转矩的反馈但保留机械速度到电气状态的观测，`TORQUE_FEEDBACK_FULL` 为完整互连。Schur 最小奇异值与 rcond 用于检查消去电气状态后低频机械闭环是否接近奇异；它们不是稳定性判据。该审计只用于验证 MWT 近零频慢分支的幅相互连，不把单个频点直接命名为结构零或普适负阻尼。\n\n');
+fprintf(fid,'## MWT-DVC低频互连的局部物理解释\n\n');
+fprintf(fid,'在完整互连、1 mHz处，MWT的 `Delta T_e/Delta omega_g` 实部为 %.6g，GFL为 %.6g，GWT为 %.6g；相应环路乘积实部分别为 %.6g、%.6g、%.6g，MWT环路相位为 %.6g deg。这个符号差异与当前M3方程 `eDc=Vdc0-Udc`、`iq_ref=Kpdc*eDc+xi_DVC` 以及正发电制动转矩约定相容：\n\n',mwte,gfle,gwtE,mwtloop,gflLoop,gwtLoop,mwtphase);
+fprintf(fid,'```text\n速度上升 -> P_MSC 上升 -> Udc 上升 -> eDc 下降\n         -> iq_ref 下降 -> T_e 下降 -> 发电机加速度进一步上升\n```\n\n');
+fprintf(fid,'因此，当前Frozen-Wake互连下的MWT结果支持一个**局部低频反向反馈候选**：DVC使速度扰动对应的电磁制动转矩减小，而不是直接证明2.5 Hz轴系模态获得负阻尼。GFL/GWT在同一机械对象和同一频点的电气增益实部为正，环路乘积实部为负，表现为相反的局部反馈方向。该解释依赖当前工作点、端口定义、OpenFAST低速等效桥接和连续M3控制方程；它不是GFM普遍规律，也不能替代直接驱动或动态气动模型验证。\n\n');
 fprintf(fid,'\n## 近零频慢速分支反事实\n\n');writeM3Table(fid,S6.slow_mode_counterfactuals);
 fprintf(fid,'\n上述反事实分别保留或移除发电机方位状态，再连续闭合电磁转矩反馈和MSC-DVC。MWT的DVC已分为PI、仅P、仅I三类，每个点均重新求解平衡点；`TorqueFeedbackOpen*`列用于区分控制子系统自身不稳定与仅在机电闭环中出现的极点。该方位状态测试仅用于坐标敏感性，不能作为可直接采纳的物理模型。\n\n');
 fprintf(fid,'## 慢速分支参与因子分组\n\n');writeM3Table(fid,S6.slow_mode_participation);
