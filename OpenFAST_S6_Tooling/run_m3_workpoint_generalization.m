@@ -680,7 +680,7 @@ function rows=s6LowFrequencyInterconnectionRows(Aof,Bt,iWg,L,gear,archName)
 % 紧凑的低频电—机互连审计。该函数只返回频响和Schur摘要，避免保存
 % OpenFAST/M3完整矩阵。Closure=TORQUE_FEEDBACK_OPEN表示切断
 % 电气状态到机械转矩的反馈，但保留机械速度到电气子系统的观测；
-% Closure=TORQUE_FEEDBACK_FULL表示完整互连。
+% Closure=TORQUE_FEEDBACK_FULL表示完整闭环。
 freqs=[1e-3 3e-3 1e-2 3e-2 1e-1 1 2.5];
 AofN=Aof;BtN=Bt;iWgN=iWg;
 Cwg=zeros(1,size(AofN,1));Cwg(iWgN)=1;kT=1/gear;
