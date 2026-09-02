@@ -7,6 +7,7 @@
 - `run_m3_workpoint_generalization.m`：M3 跨运行点主入口，按 `StopAfter` 选择 S1–S6 阶段。
 - `analyze_v500_baseline.m`：OpenFAST v5.0.0 周期线性化与 MBC/Floquet 基线审计。
 - `analyze_frozenwake_torque_probe.m`：冻结尾流 OpenFAST 独立转矩探针；只用于诊断，不是 Simulink 联合仿真。
+- `run_minimal_te_openfast_gate.m`：官方 Simulink 示例的临时外部转矩阶跃 Gate；验证 `Te -> OpenFAST -> RotSpeed/GenSpeed`，只保存汇总和图。
 
 ## 使用边界
 
@@ -30,6 +31,18 @@ S = analyze_frozenwake_torque_probe();
 ```
 
 若输出 `NO_ISOLATED_DECAY`，只能记录“有限响应可观察”，不得把结果当作可辨识阻尼或联合验证证据。
+
+最小接口 Gate（需显式提供本地 v5.0.0 资产路径）：
+
+```matlab
+S = run_minimal_te_openfast_gate( ...
+    'SimulinkDir', '<FAST_SFunc.mexw64 所在目录>', ...
+    'ExampleDir',  '<OpenLoop.mdl 所在目录>', ...
+    'FastFile',    '<5MW 外部转矩案例 .fst>', ...
+    'OutputDir',   '<临时输出目录>');
+```
+
+该 Gate 只证明输入输出接口和 OpenFAST 机械响应路径，不等同于当前 PMSG 电气模型的联合仿真，也不直接证明任何 GFM 轴系稳定性结论。
 
 ## 版本与资产
 
