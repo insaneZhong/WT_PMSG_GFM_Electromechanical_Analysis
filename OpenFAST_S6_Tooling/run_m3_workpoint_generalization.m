@@ -20,6 +20,10 @@ ip.addParameter('S5BAuditWindFactors',1.05:0.005:1.35,@(x)isnumeric(x)&&isvector
 ip.addParameter('S5BAuditMarginWindFactors',[1.05 1.15 1.25 1.35],@(x)isnumeric(x)&&isvector(x));
 ip.addParameter('S6OpenFASTRoot','',@(x)ischar(x)||isstring(x));
 ip.addParameter('S6Variant','DYNAMIC_AERODYN',@(x)ischar(x)||isstring(x));
+% 可选的临时案例入口。默认留空时完全沿用官方 S6 案例；填写后只
+% 用于条件性候选诊断，并强制保留 source-traceability Gate 失败状态。
+ip.addParameter('S6CaseDir','',@(x)ischar(x)||isstring(x));
+ip.addParameter('S6CaseStem','',@(x)ischar(x)||isstring(x));
 ip.parse(varargin{:}); opt=ip.Results;
 opt.S5BControllerMode=upper(char(string(opt.S5BControllerMode)));
 assert(any(strcmp(opt.S5BControllerMode,{'LEGACY_CONSTANT','NREL5MW_SCHEDULED_LSS'})),'Unsupported S5BControllerMode.');
@@ -30,6 +34,9 @@ assert(any(strcmp(stopAfter,{'S1','S2','S3','S4','S5A','S5B','S5B_AUDIT','S6'}))
 s6Variant=upper(char(string(opt.S6Variant)));
 assert(any(strcmp(s6Variant,{'DYNAMIC_AERODYN','FROZEN_WAKE'})), ...
     'S6Variant must be DYNAMIC_AERODYN or FROZEN_WAKE.');
+s6CaseDir=char(string(opt.S6CaseDir));s6CaseStem=char(string(opt.S6CaseStem));
+assert((isempty(s6CaseDir)&&isempty(s6CaseStem)) || (~isempty(s6CaseDir)&&~isempty(s6CaseStem)), ...
+    'S6CaseDir and S6CaseStem must be supplied together.');
 
 here=fileparts(mfilename('fullpath'));
 idealRoot=fileparts(here);
@@ -276,7 +283,7 @@ if strcmp(stopAfter,'S6')
     assert(strcmpi(opt.S5BControllerMode,'NREL5MW_SCHEDULED_LSS'),'S6必须使用来源可追溯的NREL5MW_SCHEDULED_LSS连续Pitch基准。');
     assert(exist('gateS5BAudit','var')==1&&gateS5BAudit.pass,'S5B可追溯连续命令级基准未通过，禁止进入S6。');
     s6Root=char(string(opt.S6OpenFASTRoot));if isempty(s6Root),s6Root=fullfile(here,'temp','OpenFAST_S6');end
-    [S6,gateS6]=runM3S6(base,p0,m0Dir,s6Root,s6Variant);
+    [S6,gateS6]=runM3S6(base,p0,m0Dir,s6Root,s6Variant,s6CaseDir,s6CaseStem);
     R.stageS6=S6;R.gateS6=gateS6;
     if opt.SaveOutputs
         if strcmp(s6Variant,'FROZEN_WAKE')
@@ -294,14 +301,19 @@ if strcmp(stopAfter,'S6')
 end
 end
 
-function [S6,gate]=runM3S6(base,p0,m0Dir,ofRoot,variant)
+function [S6,gate]=runM3S6(base,p0,m0Dir,ofRoot,variant,customCaseDir,customCaseStem)
 % S6：用官方OpenFAST周期稳态线性化模型做局部柔性机械反例测试。
 % 完整AeroDyn动态MBC矩阵先接受稳定性审计；若其内部诱导速度状态含
 % 大量RHP极点，则不把这些数值模态接入GFM。S6仅在AeroDyn内部状态
 % 可稳定静态消元时建立ElastoDyn柔性机械+准稳态气动的条件性模型。
 variant=upper(char(string(variant)));
+if nargin<6,customCaseDir='';end
+if nargin<7,customCaseStem='';end
 toolboxDir=fullfile(ofRoot,'matlab-toolbox');
-if strcmp(variant,'FROZEN_WAKE')
+isCustomCase=~isempty(customCaseDir);
+if isCustomCase
+    caseDir=char(string(customCaseDir));caseStem=char(string(customCaseStem));
+elseif strcmp(variant,'FROZEN_WAKE')
     caseStem='5MW_Land_Linear_Aero_CalcSteady_v500_frozen';
     caseDir=fullfile(ofRoot,'runtime',caseStem);
 else
@@ -362,7 +374,9 @@ az=sort(mod(azPhase,2*pi));azGap=diff([az;az(1)+2*pi]);azErr=max(abs(azGap-2*pi/
 uTq=find(contains(string(lin0.u_desc),"ED Generator torque"),1);tqHss=lin0.u_op{uTq};tqLss=gear*tqHss;powerOF=tqLss*omegaOF;
 energyErr=abs(tqHss*(gear*omegaGeAzOF)-tqLss*omegaOF)/max(abs(powerOF),1);
 [gitStatus,gitHash]=system(sprintf('git -C "%s" rev-parse HEAD',fullfile(ofRoot,'r-test')));gitHash=strtrim(gitHash);
-sourceTraceable=gitStatus==0&&strlength(string(gitHash))>=7;
+% 自定义候选可能复用了官方 r-test 工具，但案例参数本身并非官方
+% 资产；因此不能让工具仓库的 Git 哈希冒充案例可追溯性。
+sourceTraceable=~isCustomCase && gitStatus==0&&strlength(string(gitHash))>=7;
 
 % 重新求与OpenFAST低速轴速度、等效转矩和功率一致的三架构工作点。
 p=p0(:);p(12)=omegaOF;p(37)=powerOF;p(39)=tqLss;p(40)=pccVoltageMagnitudeForPQ(p(37),p(38),p(4),p(9),p(3)*p(10));
@@ -573,6 +587,7 @@ LF.Architecture=string(LF.Architecture);LF.Closure=string(LF.Closure);
 mwtPhase=PV(PV.Architecture=="MWT"&PV.CoordinateTreatment=="FULL_COORD",:);
 phaseSignConsistent=all(mwtPhase.MaxRealPole>0)||all(mwtPhase.MaxRealPole<0);
 fullFloquet=FV(FV.CoordinateTreatment=="FULL_COORD",:);allFloquetStable=all(fullFloquet.Stable);
+angleRemovedFloquet=FV(FV.CoordinateTreatment=="ANGLE_REMOVED",:);allAngleRemovedFloquetStable=all(angleRemovedFloquet.Stable);
 openFloquet=FV(FV.CoordinateTreatment=="TORQUE_FEEDBACK_OPEN",:);allOpenLoopFloquetStable=all(openFloquet.Stable);
 mwtFloquet=FV(FV.Architecture=="MWT"&FV.CoordinateTreatment=="FULL_COORD",:);
 mwtOpenFloquet=FV(FV.Architecture=="MWT"&FV.CoordinateTreatment=="TORQUE_FEEDBACK_OPEN",:);
@@ -582,13 +597,30 @@ simulinkInterfaceAudit=inspectS6NonlinearSimulinkInterface(ofRoot);
 sourceGate=sourceTraceable&&mbc.performedTransformation&&azErr<0.02&&interfaceUnique;
 if frozenWakeDirect
     reductionGate=fullRhp==0&&redStable;
-    evidenceScope='OPENFAST_FROZEN_WAKE_DIRECT_ELASTODYN_LOW_SPEED_EQUIVALENT_INTERFACE';
-    if allHybridStable&&allFloquetStable
-        s6Status='FROZEN_WAKE_DIRECT_HYBRID_GATE_PASS';
-        nextRule='Frozen-wake direct plant and all hybrid variants passed this local Gate; S7 may begin as a separate discrete-average validation.';
+    if isCustomCase
+        evidenceScope='CONDITIONAL_CUSTOM_FROZEN_WAKE_DIRECT_ELASTODYN_LOW_SPEED_EQUIVALENT_INTERFACE';
     else
-        s6Status='FAILED_FROZEN_WAKE_MWT_DVC_SLOW_MODE';
-        nextRule='Do not enter S7. The frozen-wake plant and torque-feedback-open counterfactuals are stable, but the MWT DVC torque closure creates a zero-frequency slow mode. Audit it as a local cross-model coupling candidate, not as torsional instability.';
+        evidenceScope='OPENFAST_FROZEN_WAKE_DIRECT_ELASTODYN_LOW_SPEED_EQUIVALENT_INTERFACE';
+    end
+    if allHybridStable&&allFloquetStable
+        if isCustomCase
+            s6Status='CONDITIONAL_CUSTOM_FROZEN_WAKE_HYBRID_STABLE_SOURCE_GATE_FAIL';
+            nextRule='Custom case is conditionally stable after the mechanical audit, but source traceability failed; do not treat it as a physical cross-model validation or enter S7.';
+        else
+            s6Status='FROZEN_WAKE_DIRECT_HYBRID_GATE_PASS';
+            nextRule='Frozen-wake direct plant and all hybrid variants passed this local Gate; S7 may begin as a separate discrete-average validation.';
+        end
+    elseif isCustomCase && allHybridStable&&allAngleRemovedFloquetStable
+        s6Status='CONDITIONAL_CUSTOM_FROZEN_WAKE_HYBRID_STABLE_SOURCE_GATE_FAIL';
+        nextRule='Custom case is physically stable after removal of the generator-angle gauge, but source traceability/full-coordinate gauge Gate failed; do not treat it as a physical cross-model validation or enter S7.';
+    else
+        if isCustomCase
+            s6Status='FAILED_CUSTOM_FROZEN_WAKE_HYBRID_MWT_DVC_OR_MECHANICAL_MODE';
+            nextRule='Do not enter S7. The custom case failed a hybrid stability condition; retain it only as a conditional diagnostic and locate the dominant branch before any retuning.';
+        else
+            s6Status='FAILED_FROZEN_WAKE_MWT_DVC_SLOW_MODE';
+            nextRule='Do not enter S7. The frozen-wake plant and torque-feedback-open counterfactuals are stable, but the MWT DVC torque closure creates a zero-frequency slow mode. Audit it as a local cross-model coupling candidate, not as torsional instability.';
+        end
     end
 else
     reductionGate=rcondAero>1e-6&&redStable;
@@ -600,7 +632,7 @@ gate=struct('pass',sourceGate&&reductionGate&&commonWp&&energyErr<1e-12&&torqueS
     'source_traceable',sourceTraceable,'r_test_commit',gitHash,'mbc_performed',mbc.performedTransformation,'azimuth_spacing_error_rad',azErr, ...
     'full_dynamic_aero_usable',fullRhp==0,'full_dynamic_aero_rhp_poles',fullRhp,'full_dynamic_aero_max_real',fullMax, ...
     'aerodyn_static_condensation_rcond',rcondAero,'reduced_mechanics_max_real_nonrigid',redMax,'reduced_mechanics_stable',redStable, ...
-    'common_workpoint_pass',commonWp,'low_speed_interface_energy_error',energyErr,'all_hybrid_nonrigid_stable',allHybridStable,'all_floquet_stable',allFloquetStable,'all_open_loop_floquet_stable',allOpenLoopFloquetStable,'mwt_slow_growth_increment_per_s',mwtSlowGrowthIncrement, ...
+    'common_workpoint_pass',commonWp,'low_speed_interface_energy_error',energyErr,'all_hybrid_nonrigid_stable',allHybridStable,'all_floquet_stable',allFloquetStable,'all_angle_removed_floquet_stable',allAngleRemovedFloquetStable,'all_open_loop_floquet_stable',allOpenLoopFloquetStable,'mwt_slow_growth_increment_per_s',mwtSlowGrowthIncrement, ...
     'all_drive_mode_identity_pass',allModeIdentity,'max_electrical_dependence_on_removed_theta_wt',maxExtraneous, ...
     'all_dvc_counterfactual_equilibria_pass',allDvcCounterfactualEquilibriaPass, ...
     'phase_aerodyn_condensation_rcond_min',min(phaseRcond),'mwt_full_coordinate_phase_sign_consistent',phaseSignConsistent, ...
