@@ -285,6 +285,8 @@ if strcmp(stopAfter,'S6')
             s6Tag='M3_S6_OpenFAST_Flexible_Mechanics';
         end
         writetable(S6.summary,fullfile(here,[s6Tag '_Summary.csv']));
+        % 低频电—机互连只保存紧凑的频域/Schur摘要，不保存矩阵或时序。
+        writetable(S6.low_frequency_interconnection_audit,fullfile(here,[s6Tag '_LowFrequency_Interconnection.csv']));
         makeM3S6Figure(fullfile(here,[s6Tag '.png']),S6);
         writeM3S6Report(fullfile(here,[s6Tag '_Report_CN.md']),S6,gateS6);
     end
@@ -413,7 +415,7 @@ lamRed=eig(Aof);rigidRed=abs(imag(lamRed))<1e-6&abs(real(lamRed))<1e-3;redMax=ma
 torqueInputAcceleration=Bt(iWg);
 torqueSignConsistent=torqueInputAcceleration<0;
 assert(torqueSignConsistent,'OpenFAST positive generator torque does not decelerate the generator-speed coordinate.');
-rows={};modalRows={};closureRows={};slowPartRows={};dcLinkRows={};sourceSlopeRows={};impedanceRows={};allHybridStable=true;allModeIdentity=true;maxExtraneous=0;
+rows={};modalRows={};closureRows={};slowPartRows={};dcLinkRows={};sourceSlopeRows={};impedanceRows={};lfRows={};allHybridStable=true;allModeIdentity=true;maxExtraneous=0;
 for a=1:numel(models)
     M=models{a};L=M.linear;ln=string(L.state_names(:));iW=find(ln=="omega_g",1);iTheta=find(ln=="theta_sh",1);iWt=find(ln=="omega_t",1);
     m3NativeMaxReal=max(real(eig(L.A)));m3NativeStable=m3NativeMaxReal<0;
@@ -439,6 +441,7 @@ for a=1:numel(models)
             -real(1/GmM3Band),-real(1/GmOpenFASTBand)}; %#ok<AGROW>
     end
     Ah=[Aof+Bt*kT*DteW*Cwg Bt*kT*CteE;Aew*Cwg Aee];
+    lfRows=[lfRows;s6LowFrequencyInterconnectionRows(Aof,Bt,iWg,L,gear,string(M.name))]; %#ok<AGROW>
     noGauge=openFastHybridDiagnostic(Aof,Bt,ofNames,iGeAng,iWg,L,gear,1,true);
     fullTorqueOpen=openFastHybridDiagnostic(Aof,Bt,ofNames,iGeAng,iWg,L,gear,0,false);
     fullTorqueClosed=openFastHybridDiagnostic(Aof,Bt,ofNames,iGeAng,iWg,L,gear,1,false);
@@ -565,6 +568,8 @@ SS=cell2table(sourceSlopeRows,'VariableNames',{'M3ConstantPowerSlopeFactor','Equ
 SS.WorstDominantState=string(SS.WorstDominantState);
 MI=cell2table(impedanceRows,'VariableNames',{'Architecture','Frequency_Hz','M3MechanicalGainReal','M3MechanicalGainImag','OpenFASTMechanicalGainReal','OpenFASTMechanicalGainImag','MagnitudeRatio_OpenFASTOverM3','PhaseDifference_deg_OpenFASTMinusM3','M3EffectiveMechanicalDamping_NmsPerRad','OpenFASTEffectiveMechanicalDamping_NmsPerRad'});
 MI.Architecture=string(MI.Architecture);
+LF=cell2table(lfRows,'VariableNames',{'Architecture','Closure','Frequency_Hz','ElectricalGainReal','ElectricalGainImag','MechanicalGainReal','MechanicalGainImag','LoopGainReal','LoopGainImag','LoopPhase_deg','ElectricalResolventNorm','SchurMinSingularValue','SchurRcond','DirectMechanicalFeedbackNorm','ElectricToMechanicalNorm','MechanicalToElectricNorm'});
+LF.Architecture=string(LF.Architecture);LF.Closure=string(LF.Closure);
 mwtPhase=PV(PV.Architecture=="MWT"&PV.CoordinateTreatment=="FULL_COORD",:);
 phaseSignConsistent=all(mwtPhase.MaxRealPole>0)||all(mwtPhase.MaxRealPole<0);
 fullFloquet=FV(FV.CoordinateTreatment=="FULL_COORD",:);allFloquetStable=all(fullFloquet.Stable);
@@ -606,7 +611,7 @@ gate=struct('pass',sourceGate&&reductionGate&&commonWp&&energyErr<1e-12&&torqueS
     'evidence_scope',evidenceScope, ...
     's6_status',s6Status, ...
     'next_rule',nextRule,'variant',variant,'frozen_wake_direct',frozenWakeDirect);
-S6=struct('objective','S6 local flexible-mechanics counterexample test using official OpenFAST periodic linearization','variant',variant,'summary',T,'modal_candidates',MM,'slow_mode_counterfactuals',CV,'slow_mode_participation',SP,'dvc_feasibility',dvcFeasibility,'dc_link_capacitance_audit',DC,'constant_power_source_slope_audit',SS,'low_frequency_mechanical_impedance_audit',MI,'phase_sensitivity',PV,'floquet',FV,'workpoint_audit',workAudit,'m3_reference_torsion',m3Tor,'simulink_nonlinear_interface_audit',simulinkInterfaceAudit,'gate',gate);
+S6=struct('objective','S6 local flexible-mechanics counterexample test using official OpenFAST periodic linearization','variant',variant,'summary',T,'modal_candidates',MM,'slow_mode_counterfactuals',CV,'slow_mode_participation',SP,'dvc_feasibility',dvcFeasibility,'dc_link_capacitance_audit',DC,'constant_power_source_slope_audit',SS,'low_frequency_mechanical_impedance_audit',MI,'low_frequency_interconnection_audit',LF,'phase_sensitivity',PV,'floquet',FV,'workpoint_audit',workAudit,'m3_reference_torsion',m3Tor,'simulink_nonlinear_interface_audit',simulinkInterfaceAudit,'gate',gate);
 end
 
 function A=inspectS6NonlinearSimulinkInterface(ofRoot)
@@ -668,6 +673,41 @@ q=struct('A',Ah,'state_names',{names},'maxReal',maxReal,'worstFrequency_Hz',freq
     'GeProbeReal',real(GeProbe),'GeProbeImag',imag(GeProbe),'GmProbeReal',real(GmProbe),'GmProbeImag',imag(GmProbe), ...
     'loopProbeReal',real(GeProbe*GmProbe),'loopProbeImag',imag(GeProbe*GmProbe), ...
     'PiOpenFAST',sum(pf(1:numel(keep))),'PiGeneratorSpeed',pf(iWgN),'PiTorsionalFlex',piTorsionalFlex,'PiUdc',piUdc,'PiXiDvc',piXiDvc);
+end
+
+function rows=s6LowFrequencyInterconnectionRows(Aof,Bt,iWg,L,gear,archName)
+%S6LOWFREQUENCYINTERCONNECTIONROWS
+% 紧凑的低频电—机互连审计。该函数只返回频响和Schur摘要，避免保存
+% OpenFAST/M3完整矩阵。Closure=TORQUE_FEEDBACK_OPEN表示切断
+% 电气状态到机械转矩的反馈，但保留机械速度到电气子系统的观测；
+% Closure=TORQUE_FEEDBACK_FULL表示完整互连。
+freqs=[1e-3 3e-3 1e-2 3e-2 1e-1 1 2.5];
+AofN=Aof;BtN=Bt;iWgN=iWg;
+Cwg=zeros(1,size(AofN,1));Cwg(iWgN)=1;kT=1/gear;
+ln=string(L.state_names(:));mech=ismember(ln,["theta_sh","omega_t","omega_g"]);
+eidx=find(~mech);iW=find(ln=="omega_g",1);iyTe=find(string(L.output_names)=="T_e",1);
+assert(~isempty(iW)&&~isempty(iyTe),'S6 low-frequency audit: M3 omega_g/T_e state or output missing.');
+Aee=L.A(eidx,eidx);Aew=L.A(eidx,iW);CteE=L.C(iyTe,eidx);DteW=L.C(iyTe,iW);
+Aem=Aew*Cwg;Bme=BtN*kT*CteE;
+rows={};
+for closure=[0 1]
+    if closure==0
+        closureName="TORQUE_FEEDBACK_OPEN";Amm=AofN;BmeEff=zeros(size(Bme));directMech=0;
+    else
+        closureName="TORQUE_FEEDBACK_FULL";Amm=AofN+BtN*kT*DteW*Cwg;BmeEff=Bme;directMech=norm(BtN*kT*DteW*Cwg,2);
+    end
+    for f=freqs
+        s=1i*2*pi*f;
+        Re=(s*eye(size(Aee))-Aee)\Aew;
+        Ge=DteW+CteE*Re;
+        Gm=Cwg*((s*eye(size(AofN))-AofN)\(BtN*kT));
+        loop=Ge*Gm;
+        Schur=(s*eye(size(Amm))-Amm)-BmeEff*((s*eye(size(Aee))-Aee)\Aem);
+        sv=svd(Schur);rc=rcond(Schur);
+        rows(end+1,:)={archName,closureName,f,real(Ge),imag(Ge),real(Gm),imag(Gm),real(loop),imag(loop),rad2deg(angle(loop)), ...
+            norm(Re,2),min(sv),rc,directMech,norm(BmeEff,2),norm(Aem,2)}; %#ok<AGROW>
+    end
+end
 end
 
 function q=periodicFloquetMetrics(phaseModels,phaseDt)
@@ -732,6 +772,9 @@ fprintf(fid,'\n上述量均定义为低速轴正发电制动转矩到发电机�
 fprintf(fid,'## 低频频带机械阻抗核验\n\n');
 writeM3Table(fid,S6.low_frequency_mechanical_impedance_audit(S6.low_frequency_mechanical_impedance_audit.Architecture=="MWT",:));
 fprintf(fid,'\n此表把同一低速轴正发电制动转矩到低速等效发电机转速的**开环机械传递**从 1 mHz 扩展到 100 mHz。三架构共享机械对象，故只展示MWT一行组，避免把相同机械结果重复计作控制差异。OpenFAST/M3增益比从 %.4g（1 mHz）变为 %.4g（100 mHz），相位差分别为 %.4g 与 %.4g deg；因此两个机械对象的差异不是可用单一惯量或增益比例修正的常数差异。M3定功率源的速度斜率只能解释近零频候选敏感性，不能单独解释整个低频带，更不能外推为2.5 Hz扭振结论。该核验仍是OpenFAST周期稳态线性化矩阵的频率响应，不是OpenFAST—Simulink时域联合仿真；因此可检验单点差异是否在低频带持续存在，但不能独立验证非线性时域幅值。\n\n',MIshow.MagnitudeRatio_OpenFASTOverM3(1),MIshow.MagnitudeRatio_OpenFASTOverM3(end),MIshow.PhaseDifference_deg_OpenFASTMinusM3(1),MIshow.PhaseDifference_deg_OpenFASTMinusM3(end));
+fprintf(fid,'\n## 低频电—机互连频响与 Schur 审计\n\n');
+writeM3Table(fid,S6.low_frequency_interconnection_audit);
+fprintf(fid,'\n本表在 1 mHz–2.5 Hz 仅保存紧凑频域量：`ElectricalGain` 为 `Delta T_e/Delta omega_g`，`MechanicalGain` 为 `Delta omega_g/Delta T_e`，`LoopGain` 为两者乘积。`TORQUE_FEEDBACK_OPEN` 切断电气状态到机械转矩的反馈但保留机械速度到电气状态的观测，`TORQUE_FEEDBACK_FULL` 为完整互连。Schur 最小奇异值与 rcond 用于检查消去电气状态后低频机械闭环是否接近奇异；它们不是稳定性判据。该审计只用于验证 MWT 近零频慢分支的幅相互连，不把单个频点直接命名为结构零或普适负阻尼。\n\n');
 fprintf(fid,'\n## 近零频慢速分支反事实\n\n');writeM3Table(fid,S6.slow_mode_counterfactuals);
 fprintf(fid,'\n上述反事实分别保留或移除发电机方位状态，再连续闭合电磁转矩反馈和MSC-DVC。MWT的DVC已分为PI、仅P、仅I三类，每个点均重新求解平衡点；`TorqueFeedbackOpen*`列用于区分控制子系统自身不稳定与仅在机电闭环中出现的极点。该方位状态测试仅用于坐标敏感性，不能作为可直接采纳的物理模型。\n\n');
 fprintf(fid,'## 慢速分支参与因子分组\n\n');writeM3Table(fid,S6.slow_mode_participation);
