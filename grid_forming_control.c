@@ -18,6 +18,18 @@
 #ifdef ENABLE_SCHEMEA_OVERRIDES
 #include        "schemeA_tuning_overrides.h"
 #endif
+#ifndef GSI_LVRT_CURRENT_REF_AW_GAIN
+#define GSI_LVRT_CURRENT_REF_AW_GAIN 0.0f
+#endif
+#ifndef GSI_LVRT_VOLTAGE_AW_GAIN
+#define GSI_LVRT_VOLTAGE_AW_GAIN 0.0f
+#endif
+#ifndef GSI_LVRT_ACTIVE_CURRENT_PRIORITY
+#define GSI_LVRT_ACTIVE_CURRENT_PRIORITY 0
+#endif
+#ifndef GSI_LVRT_FREEZE_CURRENT_PI_INTEGRAL
+#define GSI_LVRT_FREEZE_CURRENT_PI_INTEGRAL 0
+#endif
 
 void clack_transform(CLACK *v);
 void park_transform(PARK *v);
@@ -40,11 +52,13 @@ CLACK clack_trans;
 PARK  park_u,park_PLL;
 GRID_SIDE_INV  grid_side =  GRID_SIDE_INV_DEFAULTS; 
 extern float system_Time;
+extern int legacy_lvrt_active;
 
 MOTOR_LOW_PASS_FILTER    lpf,lpf1;
 MOTOR_HIGH_PASS_FILTER   hpf;
 MOTOR_BAND_PASS_FILTER   bandpf;
 static float w_vsg_state = VSG_EQUIV_W0;
+static float w_vsg_sync_anchor = VSG_EQUIV_W0;
 
 float grid_side_get_w_vsg_state(void)
 {
@@ -95,6 +109,7 @@ void grid_side_reset(void)
     hpf = hpf_defaults;
     bandpf = bandpf_defaults;
     w_vsg_state = VSG_EQUIV_W0;
+    w_vsg_sync_anchor = VSG_EQUIV_W0;
 }
 
 //##########################################################################################################
@@ -102,9 +117,11 @@ void grid_side_reset(void)
 //##########################################################################################################
 void grid_side_control(GRID_SIDE_INV *p)
 {	
+    int gfm_enabled;
     
     /* Deterministic pre-synchronization state update to avoid startup chattering. */
     p->val.Pre_syn = (system_Time >= PRESYN_SWITCH_TIME) ? 1 : 0;
+    gfm_enabled = (system_Time >= GSI_GFM_ENABLE_TIME_S) ? 1 : 0;
     /* steady-state validation: keep active-power reference constant */
 
 //##########################################################################################################
@@ -151,6 +168,19 @@ void grid_side_control(GRID_SIDE_INV *p)
          if( p->val.grid_phase_angle < 0)
             { p->val.grid_phase_angle =  p->val.grid_phase_angle + MOTOR_2PI_RADIAN;}       
       }   
+      else if(!gfm_enabled)
+      {
+          /* After breaker closure, do not let the PLL follow a PCC voltage
+           * that is already influenced by the converter itself.  Preserve
+           * the synchronized angle and advance it at the known grid nominal
+           * frequency until the VSG takes over. */
+          p->val.freq = GSI_NOMINAL_OMEGA_RADPS;
+          p->val.grid_phase_angle += p->Ts * p->val.freq;
+          if (p->val.grid_phase_angle > MOTOR_2PI_RADIAN)
+              p->val.grid_phase_angle -= MOTOR_2PI_RADIAN;
+          if (p->val.grid_phase_angle < 0)
+              p->val.grid_phase_angle += MOTOR_2PI_RADIAN;
+      }
 ////////////////////////////////////////////////////////////////////////////////////      
       clack_trans.a = p->bak.Ia1;
       clack_trans.b = p->bak.Ib1;
@@ -200,8 +230,8 @@ void grid_side_control(GRID_SIDE_INV *p)
 //                             P-f控制
 //########################################################################################################## 
       float m1,m2,m4,m3=0;
-      p->pf.we_set = 314;
-      if  (p->val.Pre_syn == 1 )
+      p->pf.we_set = GSI_NOMINAL_OMEGA_RADPS;
+      if  (gfm_enabled)
       {
           vloop_slope.Ts    = p->Ts;
           vloop_slope.Init = 0;
@@ -211,16 +241,47 @@ void grid_side_control(GRID_SIDE_INV *p)
 
 #if ENABLE_VSG_EQUIV_WREF
           {
-              float p_err = vloop_slope.Out - p->val.pcc_P_active_Power_filter;
-              float dw = (p_err - (w_vsg_state - VSG_EQUIV_W0)/VSG_EQUIV_MP) / (2.0f*VSG_EQUIV_H*VSG_EQUIV_W0);
+              float p_err = vloop_slope.Out -
+                  p->val.pcc_P_active_Power_filter;
+              float transition_alpha;
+              float delta_w = w_vsg_state - w_vsg_sync_anchor;
+              float dw_startup = (VSG_STARTUP_POWER_ERROR_SIGN*p_err -
+                  delta_w/VSG_STARTUP_MP) /
+                  (2.0f*VSG_EQUIV_H*VSG_EQUIV_W0);
+              /* SI operating swing equation:
+               *   dw/dt = w0/(2*H*Sbase) * (DeltaP-DeltaW/mp)
+               * Preserve the validated commissioning dynamics only during
+               * cold start, then blend to the physical operating equation. */
+              float dw_operating = (VSG_POWER_ERROR_SIGN*p_err -
+                  delta_w/VSG_EQUIV_MP) *
+                  VSG_EQUIV_W0 /
+                  (2.0f*VSG_EQUIV_H*VSG_EQUIV_SBASE_W);
+              if (VSG_DYNAMICS_TRANSITION_DURATION_S <= 0.0f)
+              {
+                  transition_alpha = 1.0f;
+              }
+              else
+              {
+                  transition_alpha = (system_Time -
+                      VSG_DYNAMICS_TRANSITION_START_S) /
+                      VSG_DYNAMICS_TRANSITION_DURATION_S;
+                  if (transition_alpha < 0.0f) transition_alpha = 0.0f;
+                  if (transition_alpha > 1.0f) transition_alpha = 1.0f;
+              }
+              float dw = (1.0f-transition_alpha)*dw_startup +
+                  transition_alpha*dw_operating;
               w_vsg_state += p->Ts * dw;
+              /* Keep the validated PWM/Park angle coordinate continuous.
+               * Its measured incremental P-angle orientation is negative,
+               * therefore the operating swing equation uses P-Pref through
+               * VSG_POWER_ERROR_SIGN=-1 instead of mirroring frequency. */
               p->pf.w_ref = w_vsg_state;
           }
 #else
           power_loop_pi.Ref =  vloop_slope.Out;
           power_loop_pi.Fdb =  p->val.pcc_P_active_Power_filter;
           motor_PI2_calc(&power_loop_pi) ;          
-          p->pf.w_ref = 314 + GSI_PF_LOOP_SIGN * power_loop_pi.Out;
+          p->pf.w_ref = GSI_NOMINAL_OMEGA_RADPS + GSI_PF_LOOP_SIGN * power_loop_pi.Out;
 #endif
           
           if (p->pf.w_ref  > GSI_WREF_MAX )   p->pf.w_ref  = GSI_WREF_MAX;
@@ -229,11 +290,30 @@ void grid_side_control(GRID_SIDE_INV *p)
           p->pf.we_set = p->pf.w_ref;
           p->pf.thet_ref = p->pf.thet_ref + p->Ts * p->pf.w_ref;
       }       
-      if  (p->val.Pre_syn == 0 ) //锁相完成并网前
+      if  (!gfm_enabled) // PLL tracking before GFM takeover
       {
               p->pf.w_ref = p->val.freq;
               w_vsg_state = p->val.freq;
+              w_vsg_sync_anchor = p->val.freq;
               p->pf.thet_ref = p->val.grid_phase_angle;
+#if !ENABLE_VSG_EQUIV_WREF
+              /*
+               * Bumpless transfer for the legacy P-to-frequency PI path.
+               * Track the PLL frequency in the PI integral state while the
+               * converter is in presynchronization.  Without this tracking,
+               * the first enabled sample forces w_ref back to the hard-coded
+               * nominal value (314 rad/s), causing a phase step whenever the
+               * grid is not exactly at nominal frequency.
+               */
+              power_loop_pi.Ui =
+                  (p->val.freq - VSG_EQUIV_W0)/GSI_PF_LOOP_SIGN;
+              power_loop_pi.Out = power_loop_pi.Ui;
+              power_loop_pi.OutPreSat = power_loop_pi.Ui;
+              power_loop_pi.Up = 0.0f;
+              power_loop_pi.Up_old = 0.0f;
+              power_loop_pi.Ud = 0.0f;
+              power_loop_pi.SatErr = 0.0f;
+#endif
       }
                     
       if(p->pf.thet_ref>MOTOR_2PI_RADIAN)
@@ -247,15 +327,18 @@ void grid_side_control(GRID_SIDE_INV *p)
 //       {
 //              p->ref.voltage_ref  =  park_PLL.ud;
 //       } 
-       if  (p->val.Pre_syn == 1 )
+       if  (gfm_enabled)
        {
-             p->ref.voltage_ref = 563  + 3.45/100000.0 *(p->ref.Q_reactive_power_ref - p->val.pcc_Q_reactive_Power_filter );
-             p->bak.CosPos     =  cos( p->pf.thet_ref );
- 	         p->bak.SinPos     =  sin( p->pf.thet_ref );
+             p->ref.voltage_ref = GSI_NOMINAL_VOLTAGE_PHASE_PEAK_V +
+                 GSI_QV_DROOP_V_PER_VAR *
+                 (p->ref.Q_reactive_power_ref -
+                  p->val.pcc_Q_reactive_Power_filter);
        }
+       p->bak.CosPos = cos(p->pf.thet_ref);
+       p->bak.SinPos = sin(p->pf.thet_ref);
 
      p->pf.E_voltage_amplitude = p->ref.voltage_ref;
-     if (p->pf.E_voltage_amplitude  > 800)   p->pf.E_voltage_amplitude = 800;
+     if (p->pf.E_voltage_amplitude  > GSI_E_VOLTAGE_MAX_V)   p->pf.E_voltage_amplitude = GSI_E_VOLTAGE_MAX_V;
      if (p->pf.E_voltage_amplitude  < 0)     p->pf.E_voltage_amplitude = 0;
      
 	 p->pf.U_od_ref    =  p->pf.E_voltage_amplitude;
@@ -263,19 +346,22 @@ void grid_side_control(GRID_SIDE_INV *p)
 //##########################################################################################################    
 //                           逆变器电压环和电流环控制
 //##########################################################################################################   
-    if (p->val.Pre_syn == 1 ) 
+    if (p->val.Pre_syn == 1)
     {
+        float current_ref_magnitude;
+        float voltage_ref_magnitude;
+        float voltage_ref_limit;
+        float vector_scale;
+        float id_ref_unsat;
+        float iq_ref_unsat;
+        float ud_ref_unsat;
+        float uq_ref_unsat;
+
         d_voltage_loop_pi.Ref =  p->pf.U_od_ref;
         d_voltage_loop_pi.Fdb =  p->val.pcc_u_d;
         motor_PI2_calc(&d_voltage_loop_pi) ;
 
         p->val.Id_ref = d_voltage_loop_pi.Out  - GRID_FILTER__C * p->pf.w_ref * p->val.pcc_u_q;
-
-        d_loop_pi.Ref      =  p->val.Id_ref; 
-        d_loop_pi.Fdb      =  p->val.Id ;
-        motor_PI2_calc(&d_loop_pi);
-
-        p->val.Ud1_ref = d_loop_pi.Out  - p->pf.w_ref * GRID_FILTER__LS * p->val.Iq ;
 
         q_voltage_loop_pi.Ref =  p->pf.U_oq_ref;
         q_voltage_loop_pi.Fdb =  p->val.pcc_u_q;
@@ -283,20 +369,113 @@ void grid_side_control(GRID_SIDE_INV *p)
 
         p->val.Iq_ref = q_voltage_loop_pi.Out  + GRID_FILTER__C * p->pf.w_ref * p->val.pcc_u_d  ;
 
+        if (GSI_CURRENT_VECTOR_LIMIT_A > 0.0f &&
+            (legacy_lvrt_active || GSI_NORMAL_LIMITS_ENABLE))
+        {
+            current_ref_magnitude = sqrtf(
+                p->val.Id_ref*p->val.Id_ref +
+                p->val.Iq_ref*p->val.Iq_ref);
+            if (current_ref_magnitude > GSI_CURRENT_VECTOR_LIMIT_A)
+            {
+                float iq_remaining_limit;
+                id_ref_unsat = p->val.Id_ref;
+                iq_ref_unsat = p->val.Iq_ref;
+                if (GSI_LVRT_ACTIVE_CURRENT_PRIORITY)
+                {
+                    /* PCC voltage is d-oriented: preserve active current. */
+                    if (fabsf(p->val.Id_ref) >= GSI_CURRENT_VECTOR_LIMIT_A)
+                    {
+                        p->val.Id_ref = (p->val.Id_ref >= 0.0f) ?
+                            GSI_CURRENT_VECTOR_LIMIT_A :
+                            -GSI_CURRENT_VECTOR_LIMIT_A;
+                        p->val.Iq_ref = 0.0f;
+                    }
+                    else
+                    {
+                        iq_remaining_limit = sqrtf(
+                            GSI_CURRENT_VECTOR_LIMIT_A*GSI_CURRENT_VECTOR_LIMIT_A -
+                            p->val.Id_ref*p->val.Id_ref);
+                        if (p->val.Iq_ref > iq_remaining_limit)
+                            p->val.Iq_ref = iq_remaining_limit;
+                        if (p->val.Iq_ref < -iq_remaining_limit)
+                            p->val.Iq_ref = -iq_remaining_limit;
+                    }
+                }
+                else
+                {
+                    vector_scale =
+                        GSI_CURRENT_VECTOR_LIMIT_A/current_ref_magnitude;
+                    p->val.Id_ref *= vector_scale;
+                    p->val.Iq_ref *= vector_scale;
+                }
+                d_voltage_loop_pi.Ui += GSI_LVRT_CURRENT_REF_AW_GAIN *
+                    (p->val.Id_ref - id_ref_unsat);
+                q_voltage_loop_pi.Ui += GSI_LVRT_CURRENT_REF_AW_GAIN *
+                    (p->val.Iq_ref - iq_ref_unsat);
+            }
+        }
+
+        d_loop_pi.Ref      =  p->val.Id_ref; 
+        d_loop_pi.Fdb      =  p->val.Id ;
+        if (legacy_lvrt_active && GSI_LVRT_FREEZE_CURRENT_PI_INTEGRAL)
+        {
+            float ui_hold = d_loop_pi.Ui;
+            motor_PI2_calc(&d_loop_pi);
+            d_loop_pi.Ui = ui_hold;
+        }
+        else
+        {
+            motor_PI2_calc(&d_loop_pi);
+        }
+        p->val.Ud1_ref = d_loop_pi.Out  -
+            p->pf.w_ref * GRID_FILTER__LS * p->val.Iq ;
+
         q_loop_pi.Ref      =  p->val.Iq_ref; 
         q_loop_pi.Fdb      =  p->val.Iq ;
-        motor_PI2_calc(&q_loop_pi);
+        if (legacy_lvrt_active && GSI_LVRT_FREEZE_CURRENT_PI_INTEGRAL)
+        {
+            float ui_hold = q_loop_pi.Ui;
+            motor_PI2_calc(&q_loop_pi);
+            q_loop_pi.Ui = ui_hold;
+        }
+        else
+        {
+            motor_PI2_calc(&q_loop_pi);
+        }
 
         p->val.Uq1_ref = q_loop_pi.Out + p->pf.w_ref * GRID_FILTER__LS * p->val.Id ;
+
+        if (GSI_VOLTAGE_MODULATION_LIMIT > 0.0f &&
+            (legacy_lvrt_active || GSI_NORMAL_LIMITS_ENABLE))
+        {
+            voltage_ref_magnitude = sqrtf(
+                p->val.Ud1_ref*p->val.Ud1_ref +
+                p->val.Uq1_ref*p->val.Uq1_ref);
+            voltage_ref_limit = GSI_VOLTAGE_MODULATION_LIMIT *
+                p->bak.Udc1/1.5f;
+            if (voltage_ref_magnitude > voltage_ref_limit &&
+                voltage_ref_magnitude > 1.0e-6f)
+            {
+                ud_ref_unsat = p->val.Ud1_ref;
+                uq_ref_unsat = p->val.Uq1_ref;
+                vector_scale = voltage_ref_limit/voltage_ref_magnitude;
+                p->val.Ud1_ref *= vector_scale;
+                p->val.Uq1_ref *= vector_scale;
+                d_loop_pi.Ui += GSI_LVRT_VOLTAGE_AW_GAIN *
+                    (p->val.Ud1_ref - ud_ref_unsat);
+                q_loop_pi.Ui += GSI_LVRT_VOLTAGE_AW_GAIN *
+                    (p->val.Uq1_ref - uq_ref_unsat);
+            }
+        }
     }
     else
     {
         p->val.Uq1_ref = 0;
-        p->val.Ud1_ref = 563;
+        p->val.Ud1_ref = GSI_NOMINAL_VOLTAGE_PHASE_PEAK_V;
         p->bak.CosPos  =  cos( p->val.grid_phase_angle );
  	    p->bak.SinPos  =  sin( p->val.grid_phase_angle );
         q_loop_pi.Ui   = 0;
-        d_loop_pi.Ui   = 563;
+        d_loop_pi.Ui   = GSI_NOMINAL_VOLTAGE_PHASE_PEAK_V;
     }
     
 //##########################################################################################################

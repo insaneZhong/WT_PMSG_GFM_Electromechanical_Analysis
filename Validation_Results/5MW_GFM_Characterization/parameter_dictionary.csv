@@ -1,0 +1,59 @@
+name,value,unit,category,source,status,role
+S_base,5000000,VA,rating,Liu2024_5MW_Params,target,system power base
+P_wt_rated,5000000,W,rating,Liu2024_5MW_Params,target,rated active power
+V_LL,690,V RMS line-line,rating,Liu2024_5MW_Params,target,grid voltage rating
+Vdc,1500,V,rating,Liu Table I,target,dc-link reference and initial voltage
+Cdc,0.3,F,dc link,Liu Table I,target,dc-link capacitance
+f_base,50,Hz,rating,Liu2024_5MW_Params,target,nominal grid frequency
+fsw,10000,Hz,converter,Liu Table I,target,switching frequency
+control_Ts,4e-6,s,controller,runnable EMT realization,engineering adjustment,S-function control period
+sim_fixed_step,1e-6,s,simulation,runnable EMT realization,engineering adjustment,fixed EMT step
+SCR,4,pu,grid,study baseline,target,baseline short-circuit ratio
+Rf,0.0004761,ohm,grid filter,per-unit conversion,target,converter-side filter resistance
+Lf,4.54642010436308e-5,H,grid filter,per-unit conversion,target,converter-side filter inductance
+Cf,0.000275,F,grid filter,1 MW blueprint per-unit scaling,engineering adjustment,filter capacitance
+Rg,0.0019044,ohm,grid,per-unit conversion,target,grid equivalent resistance at SCR4
+Lg,7.57736684060514e-5,H,grid,per-unit conversion,target,grid equivalent inductance at SCR4
+omega_m0,1.27,rad/s,mechanical,Liu parameter system,target,reference turbine and generator speed
+v_w0,12.2,m/s,aerodynamic,runnable full-load balance,engineering adjustment,validated full-load wind speed
+rated_wind_speed,11.487,m/s,aerodynamic,5 MW reference turbine,target,nominal rated wind speed metadata
+rotor_radius,63,m,aerodynamic,5 MW reference turbine,target,rotor radius
+lambda_opt,7.55,1,aerodynamic,Cp curve calibration,target,optimum tip-speed ratio
+K_opt,2098405.59093648,W/(rad/s)^3,MPPT,derived from Cp curve,target,below-rated MPPT coefficient
+R_s,0.0005,ohm,PMSG,runnable EMT realization,engineering adjustment,stator resistance
+L_d,0.00105,H,PMSG,voltage-feasible EMT realization,engineering adjustment,d-axis inductance
+L_q,0.00105,H,PMSG,voltage-feasible EMT realization,engineering adjustment,q-axis inductance
+psi_f,8.64,Wb,PMSG,runnable EMT realization,engineering adjustment,PM flux linkage
+n_p,20,1,PMSG,not specified by Liu,placeholder,pole pairs
+H_t,1.93,s,drivetrain,Liu parameter system,target,turbine inertia constant
+H_g,0.8,s,drivetrain,Liu parameter system,target,generator inertia constant
+J_t,11966023.9320479,kg*m^2,drivetrain,derived from H_t,target,turbine inertia
+J_g,4960009.92001984,kg*m^2,drivetrain,derived from H_g,target,generator inertia
+K_sh,868001736.003472,N*m/rad,drivetrain,derived from K_sh_pu,target,shaft stiffness
+D_sh,3100006.2000124,N*m*s/rad,drivetrain,derived from D_sh_pu,target,shaft damping
+f_sh,2.50404324559174,Hz,drivetrain,derived,target,undamped two-mass mode frequency
+zeta_sh,0.0280952995165077,1,drivetrain,derived,target,physical shaft damping ratio
+VSG_H,3,s,GSC control,Liu Table I,target,VSG inertia constant
+vsg_startup_power_error_sign,1,1,GSC startup,verified by rated cold-start tracking,retained startup aid,commissioning power-error sign
+vsg_power_error_sign,1,1,GSC operating,verified by transition cross sections,retained,uses Pref minus Ppcc in the operating swing equation
+pf_droop_fraction,0.001,pu frequency per pu power,GSC control,stability-anchor VSG droop,engineering correction,physical P-f droop
+mp,6.28318530717959e-8,rad/s/W,GSC control,derived from 0.1 percent droop,engineering correction,VSG damping or P-f droop coefficient
+vsg_startup_mp,6.28318530717959e-8,rad/s/W,GSC startup,validated commissioning dynamics,retained startup aid,cold-start-only damping coefficient
+vsg_dynamics_transition_start_s,15,s,GSC startup,staged commissioning design,engineering adjustment,start transition to physical VSG dynamics
+vsg_dynamics_transition_duration_s,5,s,GSC startup,staged commissioning design,engineering adjustment,smooth transition duration
+vsg_operating_angle_mapping,1,delta_theta_model/delta_theta_state,GSC operating,continuous legacy PWM/Park coordinate,retained,do not mirror oscillator frequency
+qv_droop_V_per_var,9.2e-8,V/var,GSC control,scaled from k_pq,target,Q-V droop coefficient
+dvc_kp_A_per_V,7.89831826577233,A/V,MSC control,Type-c unit conversion,target,dc-voltage proportional gain
+dvc_ki_fraction,0.000108974358974359,1,MSC control,Type-c unit conversion,target,discrete integral fraction
+msc_power_ff_A_per_W,0.00309857101195684,A/W,MSC control,derived with loss factor,engineering adjustment,PCC power feedforward
+motor_current_limit,18226.8883056285,A,MSC limit,1.2 pu,target,machine current limit
+grid_current_limit,8695.65217391304,A,GSC limit,1.2 pu controller dq base,target,grid current limit
+gsc_modulation_limit,0.9,1,GSC limit,design limit,target,GSC modulation limit
+motor_voltage_limit,779.422863405995,V,MSC limit,0.9*Vdc/sqrt(3),target,machine voltage-vector limit
+grid_voltage_limit,950,V,GSC limit,0.95*Vdc/1.5,target,grid voltage-loop limit
+msc_ad_iq_limit,607.562943520949,A,active damping,4 percent rated iq,engineering adjustment,active damping current limit
+msc_ad_iq_gain,23919.8009260216,A/(rad/s),active damping,scaled from D_sh and torque constant,engineering adjustment,torsional damping gain
+presyn_switch_time,1.75,s,startup,validated startup sequence,engineering adjustment,breaker or presynchronization transition
+gfm_enable_time,2.25,s,startup,validated startup sequence,engineering adjustment,VSG takeover
+dvc_enable_time,1.25,s,startup,validated startup sequence,engineering adjustment,MSC DVC enable
+aero_enable_time,2.25,s,startup,validated startup sequence,engineering adjustment,aerodynamic release coordination

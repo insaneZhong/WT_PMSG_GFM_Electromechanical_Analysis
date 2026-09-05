@@ -1,0 +1,10 @@
+energyMetric,energyValue,energyUnit
+Paero_raw_mean,5675965.91591001,W
+Paero_effective_mean,5675965.91591443,W
+P_electromagnetic_mean,5711755.98485842,W
+Ppcc_mean,5007251.02087055,W
+mechanical_damping_loss_mean,54257.3272410435,W
+dE_mechanical_dt,-38260.6569550846,W
+dE_dc_dt,14.0816092202787,W
+mechanical_balance_residual,-51786.739229954,W
+electromagnetic_to_grid_gap,704490.882378656,W

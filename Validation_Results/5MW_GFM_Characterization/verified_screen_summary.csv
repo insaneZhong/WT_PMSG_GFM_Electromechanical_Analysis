@@ -1,0 +1,9 @@
+case_name,category,perturbation,P_pre_MW,P_post_MW,Q_pre_Mvar,Q_post_Mvar,Udc_post_V,PCC_voltage_post_V,VSG_frequency_post_Hz,grid_frequency_post_Hz,max_speed_slope_radps2,gsc_modulation_max,msc_modulation_max,gsc_limit_duty,msc_limit_duty,pass,interpretation
+baseline,Baseline,none,5.0101,5.0119,0.43432,0.43488,1498.6,460.97,50.000,50.000,0.003148,0.55673,0.58120,0,0,1,30_s_no_disturbance_pass
+pf_fplus_0p002,P-f,+0.002_Hz,5.0101,4.8066,0.43432,0.38219,1503.7,460.43,50.002,50.002,0.006897,0.55465,0.59246,0,0,1,active_power_decreases_with_grid_frequency
+pf_fminus_0p002,P-f,-0.002_Hz,5.0101,5.1899,0.43432,0.50013,1487.4,459.96,49.998,49.998,0.012938,0.56695,0.53313,0,0,1,active_power_increases_with_grid_frequency_drop
+qv_vminus_5pct,Q-V,-5_percent_grid_voltage,5.0101,4.9673,0.43432,1.1183,1507.0,460.02,50.000,50.000,0.002991,0.58708,0.60272,0,0,1,reactive_injection_increases_during_voltage_drop
+qv_vplus_5pct,Q-V,+5_percent_grid_voltage,5.0101,5.0391,0.43432,-0.22739,1503.7,460.74,50.000,50.000,0.003424,0.57772,0.57704,0,0,1,reactive_injection_decreases_during_voltage_rise
+scr2,SCR,SCR_2,4.9658,4.9718,1.6301,1.6435,1499.1,458.76,50.000,50.000,0.003304,0.57578,0.59355,0,0,1,weak_grid_screen_pass
+scr4,SCR,SCR_4_nominal,5.0101,5.0119,0.43432,0.43488,1498.6,460.97,50.000,50.000,0.003148,0.55673,0.58120,0,0,1,nominal_grid_screen_pass
+scr8,SCR,SCR_8,5.0046,4.6842,-0.26400,-0.35736,1485.0,455.36,49.999,50.005,0.013682,0.90220,3.7064,0.35066,0.62059,0,strong_grid_delayed_instability_and_saturation

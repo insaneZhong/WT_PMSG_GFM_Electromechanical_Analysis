@@ -1,0 +1,9 @@
+# 模型包只提交可追溯源文件和小型摘要，不提交仿真生成物
+results/
+temp/
+slprj/
+*.slxc
+*.mexw64
+*.log
+*.asv
+*.autosave
